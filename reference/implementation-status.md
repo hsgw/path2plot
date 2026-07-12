@@ -11,7 +11,7 @@
 | Phase | 内容                                 | ステータス | 更新日     | メモ |
 | ----- | ------------------------------------ | ---------- | ---------- | ---- |
 | 0     | プロジェクト初期セットアップ         | 完了       | 2026-07-13 | -    |
-| 1     | SVG読み込みと表示                    | 未着手     | -          | -    |
+| 1     | SVG読み込みと表示                    | 完了       | 2026-07-13 | -    |
 | 2     | パスの単純な分解                     | 未着手     | -          | -    |
 | 3     | G-code出力(基本)+実機テスト          | 未着手     | -          | -    |
 | 4     | パスの最適化・円弧処理               | 未着手     | -          | -    |
@@ -64,20 +64,20 @@
 
 **主なタスク**
 
-- [ ] ファイル選択UIとDOMParserによるSVG読込
-- [ ] 対応要素判定(`path`/`rect`/`circle`/`ellipse`/`line`/`polyline`/`polygon`/`g`)と未対応要素のエラー化(FR-1/36)
-- [ ] `defs`/`metadata`/`style`要素、`display:none`/`visibility:hidden`要素の無視
-- [ ] transform(translate/rotate/scale/skewX/skewY/matrix)のflatten処理
-- [ ] ベジェ曲線(C/Q)の折線化、許容誤差のUI設定(FR-3)
-- [ ] SVG座標系→プリンタ座標系の変換(FR-4:プリンタY = (viewBoxのmin-y + viewBoxの高さ − SVG_Y) × スケール)
-- [ ] DPI/倍率のUI設定によるスケール(FR-2)
-- [ ] stroke/fillが`none`・透明、stroke-width=0の要素の除外(FR-5)
+- [x] ファイル選択UIとDOMParserによるSVG読込
+- [x] 対応要素判定(`path`/`rect`/`circle`/`ellipse`/`line`/`polyline`/`polygon`/`g`)と未対応要素のエラー化(FR-1/36)
+- [x] `defs`/`metadata`/`style`要素、`display:none`/`visibility:hidden`要素の無視
+- [x] transform(translate/rotate/scale/skewX/skewY/matrix)のflatten処理
+- [x] ベジェ曲線(C/Q)の折線化、許容誤差のUI設定(FR-3)
+- [x] SVG座標系→プリンタ座標系の変換(FR-4:プリンタY = (viewBoxのmin-y + viewBoxの高さ − SVG_Y) × スケール)
+- [x] DPI/倍率のUI設定によるスケール(FR-2)
+- [x] stroke/fillが`none`・透明、stroke-width=0の要素の除外(FR-5)
 
 **ユニットテスト**
 
-- [ ] transform flatten(translate/rotate/scale/skewX/skewY/matrixの合成)
-- [ ] ベジェ曲線(C/Q)の折線化(許容誤差ごとの分割数・誤差)
-- [ ] SVG座標系→プリンタ座標系の変換式(FR-4、viewBox未指定時の挙動含む)
+- [x] transform flatten(translate/rotate/scale/skewX/skewY/matrixの合成)
+- [x] ベジェ曲線(C/Q)の折線化(許容誤差ごとの分割数・誤差)
+- [x] SVG座標系→プリンタ座標系の変換式(FR-4、viewBox未指定時の挙動含む)
 
 **成果物**: パース済みジオメトリをプレビュー列に単純描画(色分け・ペン分割なし)
 
@@ -104,7 +104,15 @@
 7. `fixtures/phase1/malformed.svg` を読み込み、パース不可エラーが表示され、可能な範囲で行/列等の位置情報が示される(取得できない場合はエラーメッセージ全文が表示される)ことを確認する
 8. DPI/倍率設定UIの値を変更し、プレビュー上のサイズが連動して変わることを確認する
 
-**ステータス**: 未着手
+**ステータス**: 完了
+
+**メモ**
+
+- `src/core/`にmatrix・transform属性パーサー・パス(d属性)パーサー・円弧(A)→ベジェ変換・図形(rect/circle/ellipse/line/polyline/polygon)→パスコマンド変換・ベジェ折線化・座標変換・stroke/fill解決・DOMParser統合(`svgParser.ts`)を実装。円弧(Aコマンド)は本フェーズのfixtureでは未使用だが、実データ対応のため標準的なendpoint→center parameterizationで変換する実装を含めた
+- ベジェ折線化は「制御点を最終mm座標系まで変換してから許容誤差(mm単位)で折線化する」方式とした。アフィン変換はベジェ曲線を不変に保つため、この順序で正確な結果が得られる
+- Vitestは`src/core/**/*.test.ts`(node環境)に限定されているため、DOMParserに依存する`svgParser.ts`自体はユニットテスト対象外とし、要求されている3項目(transform flatten・ベジェ折線化・座標変換式)のみをテストした。`svgParser.ts`の統合的な動作はdevサーバー+Playwrightでfixtures/phase1配下の全7ファイルを読み込んで目視・自動検証済み(unsupported-elements.svgで期待通り5件のエラー、malformed.svgで行/列付きエラー、その他は0件のエラーで正しい形状・位置に描画)
+- プレビューのフィット(拡大縮小・中心合わせ)は新規ファイル読込時のみ再計算する仕様とした。毎回自動フィットすると、DPI/倍率設定を変更してもプレビュー上のサイズが変化して見えず、ユーザーテスト8が満たせないため
+- rect要素の角丸(rx/ry)は仕様(SPEC.md)に明記がないため未対応(直角のみ)
 
 ---
 

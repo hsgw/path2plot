@@ -44,4 +44,64 @@
 .panel-body {
   flex: 1;
   overflow: auto;
+  padding: 12px;
+}
+
+.panel-body-canvas {
+  padding: 0;
+  position: relative;
+}
+
+.preview-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--text-h);
+}
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.settings-group label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.settings-file-label input[type='file'] {
+  font-size: 12px;
+}
+
+.settings-filename {
+  font-size: 12px;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.settings-errors {
+  border: 1px solid #c0392b;
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.settings-errors h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: #c0392b;
+}
+
+.settings-errors ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+}
+
+.settings-errors li {
+  margin-bottom: 4px;
+  word-break: break-word;
 }
