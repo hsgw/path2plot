@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 50">
+  <!-- FR-6: CSSクラス指定のみに依存した色。SVG属性・インラインstyle・継承のいずれからも
+       色が確定できないため、未対応要素としてFR-36のエラー対象になるはず -->
+  <style>
+    .redline { stroke: #ff0000; }
+  </style>
+  <path d="M10,25 L90,25" class="redline" fill="none" />
+</svg>

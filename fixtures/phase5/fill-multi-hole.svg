@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 40">
+  <!-- 複数穴がある形状。FR-16のevenodd/nonzero両対応確認用 -->
+
+  <!-- 左: evenodd(穴の巻き方向は問わない) -->
+  <path
+    d="M0,0 L40,0 L40,40 L0,40 Z
+       M10,10 L20,10 L20,20 L10,20 Z
+       M25,25 L35,25 L35,35 L25,35 Z"
+    fill="#000"
+    fill-rule="evenodd" />
+
+  <!-- 右: nonzero(穴は外形と逆巻きにする必要がある) -->
+  <path
+    d="M60,0 L100,0 L100,40 L60,40 Z
+       M70,10 L70,20 L80,20 L80,10 Z
+       M85,25 L85,35 L95,35 L95,25 Z"
+    fill="#000"
+    fill-rule="nonzero" />
+</svg>

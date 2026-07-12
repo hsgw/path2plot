@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="50 30 100 100">
+  <!-- viewBoxのmin-x/min-yが非ゼロ: 座標変換式(FR-4)確認用 -->
+  <rect x="50" y="30" width="10" height="10" fill="none" stroke="#000" />
+  <rect x="90" y="70" width="20" height="20" fill="none" stroke="#f00" />
+  <rect x="130" y="110" width="10" height="10" fill="none" stroke="#00f" />
+</svg>

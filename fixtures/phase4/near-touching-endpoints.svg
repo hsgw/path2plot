@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 170 100">
+  <!-- 自動結合(FR-14)確認用: デフォルト結合距離0.5mm以内の端点を持つストローク群 -->
+  <path d="M10,20 L50,20" fill="none" stroke="#000" />
+  <path d="M50.3,20.1 L90,20" fill="none" stroke="#000" />
+  <path d="M90.2,20 L130,19.9" fill="none" stroke="#000" />
+
+  <!-- 対比用: 結合距離を超える(2mm)ギャップのため結合されないはずのストローク -->
+  <path d="M10,60 L50,60" fill="none" stroke="#00f" />
+  <path d="M52,60 L90,60" fill="none" stroke="#00f" />
+</svg>

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- 描画に寄与しない要素・非表示要素は無視されることの確認用 -->
+  <metadata>this metadata element must be ignored</metadata>
+  <style>.unused { fill: red; }</style>
+
+  <defs>
+    <!-- 未参照のclipPath: idから参照されていないため無視してよい -->
+    <clipPath id="unused-clip">
+      <rect x="0" y="0" width="10" height="10" />
+    </clipPath>
+  </defs>
+
+  <!-- display:noneの要素は無視 -->
+  <g display="none">
+    <rect x="10" y="10" width="30" height="30" fill="none" stroke="#f00" />
+  </g>
+
+  <!-- visibility:hiddenの要素は無視 -->
+  <path d="M60,10 L90,10 L90,40 L60,40 Z" fill="none" stroke="#00f" visibility="hidden" />
+
+  <!-- 親からの継承によるvisibility:hidden -->
+  <g visibility="hidden">
+    <rect x="120" y="10" width="30" height="30" fill="none" stroke="#080" />
+  </g>
+
+  <!-- 正常に描画される要素(対比用) -->
+  <rect x="10" y="120" width="40" height="40" fill="none" stroke="#000" />
+</svg>

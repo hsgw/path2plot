@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 170 170">
+  <!-- 全FR横断のE2E確認用: 多色・曲線・transform・近接端点・円・穴あき塗りを組み合わせる -->
+
+  <!-- 赤ペン: ベジェ曲線 -->
+  <path d="M10,20 C10,5 60,5 60,20 S110,35 130,20" fill="none" stroke="#ff0000" />
+
+  <!-- 青ペン: transform(回転)付きの矩形 -->
+  <g transform="translate(20,60) rotate(20)">
+    <rect x="0" y="0" width="30" height="20" fill="none" stroke="#0000ff" />
+  </g>
+
+  <!-- 黒ペン: 端点が近接する2本のストローク(自動結合対象) -->
+  <path d="M100,60 L140,60" fill="none" stroke="#000000" />
+  <path d="M140.3,60.1 L160,80" fill="none" stroke="#000000" />
+
+  <!-- 緑ペン: 真円(G2/G3対象) -->
+  <circle cx="30" cy="120" r="15" fill="none" stroke="#00aa00" />
+
+  <!-- オレンジペン: 穴あき塗り(ドーナツ) -->
+  <path
+    d="M120,100 A20,20 0 1,0 120,140 A20,20 0 1,0 120,100 Z
+       M120,110 A10,10 0 1,1 120,130 A10,10 0 1,1 120,110 Z"
+    fill="#ff9900"
+    fill-rule="evenodd" />
+</svg>

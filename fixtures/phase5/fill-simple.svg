@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100">
+  <!-- 単純な塗りつぶし形状(FR-16〜21ハッチング基本確認用) -->
+  <rect x="10" y="10" width="80" height="60" fill="#000" stroke="#000" />
+  <circle cx="150" cy="40" r="35" fill="#000" stroke="#000" />
+</svg>

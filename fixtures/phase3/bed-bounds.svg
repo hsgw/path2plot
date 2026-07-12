@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 170 170">
+  <!-- 確定した描画可能領域(X43,Y40)-(X213,Y210 / 170x170mm)の四隅・全体に一致する矩形。
+       viewBox=0,0,170,170を描画可能領域全体に対応させ、実機での位置合わせを確認する -->
+  <rect x="0" y="0" width="170" height="170" fill="none" stroke="#000" />
+  <line x1="0" y1="0" x2="10" y2="0" stroke="#f00" />
+  <line x1="0" y1="0" x2="0" y2="10" stroke="#f00" />
+  <line x1="160" y1="0" x2="170" y2="0" stroke="#f00" />
+  <line x1="170" y1="0" x2="170" y2="10" stroke="#f00" />
+  <line x1="0" y1="160" x2="0" y2="170" stroke="#f00" />
+  <line x1="0" y1="170" x2="10" y2="170" stroke="#f00" />
+  <line x1="170" y1="160" x2="170" y2="170" stroke="#f00" />
+  <line x1="160" y1="170" x2="170" y2="170" stroke="#f00" />
+</svg>

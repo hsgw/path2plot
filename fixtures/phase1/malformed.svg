@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- 意図的に不正なXML(閉じタグ不整合)。パース不可エラー確認用 -->
+  <path d="M10,10 L60,10 L60,60 L10,60 Z" fill="none" stroke="#000">
+  <rect x="20" y="20" width="30" height="30" fill="none" stroke="#f00" />
+</svg>

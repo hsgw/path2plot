@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- FR-1/FR-36: 未対応要素のエラー化確認用 -->
+  <defs>
+    <linearGradient id="grad1">
+      <stop offset="0%" stop-color="#fff" />
+      <stop offset="100%" stop-color="#000" />
+    </linearGradient>
+    <clipPath id="clip1">
+      <rect x="0" y="0" width="50" height="50" />
+    </clipPath>
+  </defs>
+
+  <!-- 正常なパス(対比用) -->
+  <path d="M10,10 L60,10 L60,60 L10,60 Z" fill="none" stroke="#000" />
+
+  <!-- id参照されたclipPath(defs内にネスト) -> FR-36エラー対象 -->
+  <rect x="80" y="10" width="50" height="50" fill="none" stroke="#f00" clip-path="url(#clip1)" />
+
+  <!-- グラデーション定義の使用 -> FR-36エラー対象 -->
+  <rect x="80" y="80" width="50" height="50" fill="url(#grad1)" />
+
+  <!-- image要素 -> FR-36エラー対象 -->
+  <image x="10" y="90" width="40" height="40" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=" />
+
+  <!-- text要素 -> FR-36エラー対象(アウトライン化前提のためエラー) -->
+  <text x="10" y="150" font-size="12">unsupported text</text>
+
+  <!-- use要素 -> FR-36エラー対象 -->
+  <use href="#clip1" x="140" y="140" />
+</svg>

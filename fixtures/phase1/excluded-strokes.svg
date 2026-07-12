@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100">
+  <!-- FR-5: stroke/fillがnone・透明、stroke-width=0の要素は処理対象外 -->
+  <path d="M10,10 L60,10" stroke="none" fill="none" />
+  <path d="M10,30 L60,30" stroke="transparent" fill="none" />
+  <path d="M10,50 L60,50" stroke="#000" stroke-width="0" fill="none" />
+  <rect x="10" y="70" width="50" height="20" fill="none" stroke="none" />
+
+  <!-- 正常に処理される要素(対比用) -->
+  <path d="M100,10 L160,10" stroke="#000" stroke-width="2" fill="none" />
+</svg>

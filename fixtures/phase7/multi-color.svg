@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100">
+  <!-- FR-6〜9: 色によるペン自動分割確認用 -->
+
+  <!-- stroke赤 -->
+  <path d="M10,10 L60,10" fill="none" stroke="#ff0000" />
+
+  <!-- stroke青(インラインstyleでの色指定) -->
+  <path d="M10,25 L60,25" fill="none" style="stroke:#0000ff" />
+
+  <!-- stroke緑 -->
+  <path d="M10,40 L60,40" fill="none" stroke="#00ff00" />
+
+  <!-- 色未指定(デフォルト黒扱い、FR-8) -->
+  <path d="M10,55 L60,55" fill="none" />
+
+  <!-- 1要素でstroke色とfill色が異なる(輪郭と塗りが別ペンになるケース、FR-6) -->
+  <rect x="100" y="10" width="60" height="40" fill="#ff9900" stroke="#000000" />
+
+  <!-- 親要素からの色継承 -->
+  <g stroke="#800080">
+    <path d="M100,70 L160,70" fill="none" />
+  </g>
+</svg>

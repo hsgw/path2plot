@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100">
+  <!-- ベジェ折線化(許容誤差)確認用: 3次(C)・2次(Q)ベジェを含む -->
+  <path d="M10,50 C10,10 90,10 90,50 S170,90 190,50" fill="none" stroke="#000" />
+  <path d="M10,80 Q50,10 90,80 T170,80" fill="none" stroke="#00f" />
+</svg>

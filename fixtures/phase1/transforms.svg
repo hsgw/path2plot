@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- transform flatten確認用: translate/rotate/scale/skewX/skewY/matrixを入れ子で組み合わせる -->
+  <g transform="translate(20,20)">
+    <rect x="0" y="0" width="30" height="20" fill="none" stroke="#000" />
+    <g transform="rotate(30 15 10)">
+      <rect x="0" y="0" width="30" height="20" fill="none" stroke="#f00" />
+      <g transform="scale(1.5,0.8)">
+        <rect x="0" y="0" width="30" height="20" fill="none" stroke="#00f" />
+      </g>
+    </g>
+  </g>
+  <g transform="translate(120,40) skewX(20)">
+    <path d="M0,0 L40,0 L40,30 L0,30 Z" fill="none" stroke="#080" />
+  </g>
+  <g transform="translate(40,120) skewY(15)">
+    <path d="M0,0 L40,0 L40,30 L0,30 Z" fill="none" stroke="#808" />
+  </g>
+  <g transform="matrix(0.9,0.2,-0.2,0.9,120,130)">
+    <rect x="0" y="0" width="35" height="25" fill="none" stroke="#088" />
+  </g>
+</svg>
