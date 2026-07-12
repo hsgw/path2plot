@@ -10,6 +10,7 @@ import {
   hasVisibleStrokeOrFill,
   isDisplayNone,
   parseStyleDeclarations,
+  resolveDisplayColor,
   type StrokeFillState,
 } from './colorResolve'
 import {
@@ -274,6 +275,7 @@ function walk(
 
   const transformed = transformPathCommands(localCommands, matrix)
   const polylines = pathCommandsToPolylines(transformed, toleranceMm)
+  const color = resolveDisplayColor(strokeFillState)
 
   for (const points of polylines) {
     if (points.length < 2) continue
@@ -281,6 +283,7 @@ function walk(
       id: `stroke-${strokes.length}`,
       sourceId: elementId,
       points,
+      color,
     })
   }
 }

@@ -40,7 +40,7 @@ function App() {
         strokes={parseResult?.strokes ?? []}
         fitKey={svgText === null ? null : String(loadId)}
       />
-      <StrokeListPanel />
+      <StrokeListPanel strokes={parseResult?.strokes ?? []} />
     </div>
   )
 }

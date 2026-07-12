@@ -13,6 +13,8 @@ export interface ParsedStroke {
   id: string
   sourceId?: string
   points: Point[]
+  /** FR-26: プレビュー表示用の実際の色(stroke優先、なければfill) */
+  color: string
 }
 
 export type SvgParseErrorKind = 'parse-error' | 'unsupported-element'

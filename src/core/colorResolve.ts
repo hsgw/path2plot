@@ -84,13 +84,24 @@ export function computeStrokeFillState(
   return { stroke, fill, strokeWidth, strokeOpacity, fillOpacity, visible }
 }
 
-/** FR-5: stroke/fillともに不可視(none・透明・幅0)な要素かどうか */
-export function hasVisibleStrokeOrFill(state: StrokeFillState): boolean {
-  const strokeVisible =
+function isStrokeVisible(state: StrokeFillState): boolean {
+  return (
     !isNoneOrTransparent(state.stroke) &&
     state.strokeWidth !== 0 &&
     state.strokeOpacity !== 0
-  const fillVisible =
-    !isNoneOrTransparent(state.fill) && state.fillOpacity !== 0
-  return strokeVisible || fillVisible
+  )
+}
+
+function isFillVisible(state: StrokeFillState): boolean {
+  return !isNoneOrTransparent(state.fill) && state.fillOpacity !== 0
+}
+
+/** FR-5: stroke/fillともに不可視(none・透明・幅0)な要素かどうか */
+export function hasVisibleStrokeOrFill(state: StrokeFillState): boolean {
+  return isStrokeVisible(state) || isFillVisible(state)
+}
+
+/** FR-26: プレビュー表示に使う実際の色(strokeが可視ならstroke、そうでなければfill) */
+export function resolveDisplayColor(state: StrokeFillState): string {
+  return isStrokeVisible(state) ? state.stroke : state.fill
 }
