@@ -1,32 +1,16 @@
 import { useState } from 'react'
-import type { ParseSettings, SvgParseError } from '../types/svg'
+import type { ParseSettings } from '../types/svg'
 
 interface SettingsPanelProps {
   fileName: string | null
   settings: ParseSettings
-  errors: SvgParseError[]
   onFileSelected: (text: string, fileName: string) => void
   onSettingsChange: (settings: ParseSettings) => void
-}
-
-function describeError(error: SvgParseError): string {
-  if (error.kind === 'parse-error') {
-    const location =
-      error.line !== undefined
-        ? `(行:${error.line}${error.column !== undefined ? ` 列:${error.column}` : ''})`
-        : ''
-    return `SVGの解析に失敗しました${location}: ${error.message}`
-  }
-  const target = error.elementId
-    ? `id="${error.elementId}"`
-    : `出現順インデックス:${error.elementIndex}`
-  return `${error.message} (${target})`
 }
 
 export function SettingsPanel({
   fileName,
   settings,
-  errors,
   onFileSelected,
   onSettingsChange,
 }: SettingsPanelProps) {
@@ -111,17 +95,6 @@ export function SettingsPanel({
               />
             </label>
           </div>
-
-          {errors.length > 0 && (
-            <div className="settings-errors">
-              <h3>エラー({errors.length}件)</h3>
-              <ul>
-                {errors.map((error, i) => (
-                  <li key={i}>{describeError(error)}</li>
-                ))}
-              </ul>
-            </div>
-          )}
         </div>
       )}
     </section>

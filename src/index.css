@@ -3,6 +3,9 @@
   --text-h: #08060d;
   --bg: #fff;
   --border: #e5e4e7;
+  --error-bg: #fdecea;
+  --error-border: #c0392b;
+  --error-text: #c0392b;
 
   font:
     14px/145% system-ui,
@@ -20,6 +23,9 @@
     --text-h: #f3f4f6;
     --bg: #16171d;
     --border: #2e303a;
+    --error-bg: #3a1f1f;
+    --error-border: #e57373;
+    --error-text: #e57373;
   }
 }
 

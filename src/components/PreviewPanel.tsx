@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import type { Point } from '../types/geometry'
 import type { ParsedStroke } from '../types/svg'
 
@@ -6,6 +6,11 @@ interface PreviewPanelProps {
   strokes: ParsedStroke[]
   /** ファイルが差し替わったときだけビューのフィット(拡大縮小・中心合わせ)をやり直すためのキー */
   fitKey: string | null
+  /** FR-23: ステップ実行プレビュー。描画済みのストローク本数(0..strokes.length) */
+  step: number
+  playing: boolean
+  onStep: (next: number) => void
+  onTogglePlaying: () => void
 }
 
 interface Bounds {
@@ -15,9 +20,9 @@ interface Bounds {
   maxY: number
 }
 
-const PLAY_INTERVAL_MS = 400
 const START_MARKER_RADIUS_PX = 4
 const ARROW_SIZE_PX = 5
+const GHOST_ALPHA = 0.2
 
 function computeBounds(strokes: ParsedStroke[]): Bounds | null {
   if (strokes.length === 0) return null
@@ -72,44 +77,38 @@ function drawDirectionArrow(
   ctx.fill()
 }
 
-export function PreviewPanel({ strokes, fitKey }: PreviewPanelProps) {
+/** 1本のストロークを実線で描画し、開始点の画面座標を返す */
+function strokeOutline(
+  ctx: CanvasRenderingContext2D,
+  stroke: ParsedStroke,
+  toScreen: (p: Point) => Point,
+  defaultColor: string,
+): Point | null {
+  if (stroke.points.length < 2) return null
+  ctx.strokeStyle = stroke.color || defaultColor
+  ctx.lineWidth = 1.5
+  ctx.beginPath()
+  const [first, ...rest] = stroke.points.map(toScreen)
+  ctx.moveTo(first.x, first.y)
+  for (const p of rest) ctx.lineTo(p.x, p.y)
+  ctx.stroke()
+  return first
+}
+
+export function PreviewPanel({
+  strokes,
+  fitKey,
+  step,
+  playing,
+  onStep,
+  onTogglePlaying,
+}: PreviewPanelProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   // 直近にフィット基準として採用したmm座標系の範囲。fitKeyが変わったときだけ更新する。
   // これによりDPI/倍率設定を変えたときに(内容に合わせて毎回自動フィットするのではなく)
   // 実際の見た目のサイズが連動して変化するようにする。
   const fitBoundsRef = useRef<Bounds | null>(null)
   const lastFitKeyRef = useRef<string | null>(null)
-
-  // FR-23: ステップ実行プレビュー。stepは「描画済みのストローク本数」(0..strokes.length)
-  const [step, setStep] = useState(0)
-  const [playing, setPlaying] = useState(false)
-
-  useEffect(() => {
-    setStep(0)
-    setPlaying(false)
-  }, [fitKey])
-
-  useEffect(() => {
-    setStep((s) => Math.min(s, strokes.length))
-  }, [strokes])
-
-  useEffect(() => {
-    if (!playing) return
-    if (step >= strokes.length) {
-      setPlaying(false)
-      return
-    }
-    const timer = setInterval(() => {
-      setStep((s) => {
-        if (s + 1 >= strokes.length) {
-          setPlaying(false)
-          return strokes.length
-        }
-        return s + 1
-      })
-    }, PLAY_INTERVAL_MS)
-    return () => clearInterval(timer)
-  }, [playing, step, strokes.length])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -157,6 +156,16 @@ export function PreviewPanel({ strokes, fitKey }: PreviewPanelProps) {
       const drawnStrokes = strokes.slice(0, step)
       const defaultColor = getComputedStyle(canvas).color || '#000'
 
+      // ゴースト表示: ステップを戻しても全体像を失わないよう、全ストロークを薄く常時描画する
+      ctx.save()
+      ctx.globalAlpha = GHOST_ALPHA
+      ctx.lineJoin = 'round'
+      ctx.lineCap = 'round'
+      for (const stroke of strokes) {
+        strokeOutline(ctx, stroke, toScreen, defaultColor)
+      }
+      ctx.restore()
+
       // FR-25: ペンアップ移動経路(出現順での単純な移動)
       ctx.save()
       ctx.strokeStyle = '#e04949'
@@ -176,19 +185,13 @@ export function PreviewPanel({ strokes, fitKey }: PreviewPanelProps) {
       ctx.lineJoin = 'round'
       ctx.lineCap = 'round'
       for (const stroke of drawnStrokes) {
-        if (stroke.points.length < 2) continue
-        ctx.strokeStyle = stroke.color || defaultColor
-        ctx.lineWidth = 1.5
-        ctx.beginPath()
-        const [first, ...rest] = stroke.points.map(toScreen)
-        ctx.moveTo(first.x, first.y)
-        for (const p of rest) ctx.lineTo(p.x, p.y)
-        ctx.stroke()
+        const first = strokeOutline(ctx, stroke, toScreen, defaultColor)
+        if (!first) continue
 
         // FR-24: 開始点◯・描画方向の表示
         ctx.fillStyle = stroke.color || defaultColor
         drawStartMarker(ctx, first)
-        drawDirectionArrow(ctx, first, rest[0] ?? first)
+        drawDirectionArrow(ctx, first, toScreen(stroke.points[1]))
       }
     }
 
@@ -207,27 +210,21 @@ export function PreviewPanel({ strokes, fitKey }: PreviewPanelProps) {
         <div className="preview-step-controls">
           <button
             type="button"
-            onClick={() => {
-              setPlaying(false)
-              setStep((s) => Math.max(0, s - 1))
-            }}
+            onClick={() => onStep(Math.max(0, step - 1))}
             disabled={step <= 0}
           >
             前へ
           </button>
           <button
             type="button"
-            onClick={() => {
-              setPlaying(false)
-              setStep((s) => Math.min(total, s + 1))
-            }}
+            onClick={() => onStep(Math.min(total, step + 1))}
             disabled={step >= total}
           >
             次へ
           </button>
           <button
             type="button"
-            onClick={() => setPlaying((p) => !p)}
+            onClick={onTogglePlaying}
             disabled={total === 0}
           >
             {playing ? '停止' : '再生'}

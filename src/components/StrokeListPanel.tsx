@@ -3,9 +3,11 @@ import type { ParsedStroke } from '../types/svg'
 
 interface StrokeListPanelProps {
   strokes: ParsedStroke[]
+  /** FR-23のステップ実行プレビューと連動させ、未描画のストロークを薄く表示する */
+  step: number
 }
 
-export function StrokeListPanel({ strokes }: StrokeListPanelProps) {
+export function StrokeListPanel({ strokes, step }: StrokeListPanelProps) {
   const [isOpen, setIsOpen] = useState(true)
 
   return (
@@ -22,7 +24,10 @@ export function StrokeListPanel({ strokes }: StrokeListPanelProps) {
         <div className="panel-body">
           <ol className="stroke-list">
             {strokes.map((stroke, i) => (
-              <li key={stroke.id} className="stroke-list-item">
+              <li
+                key={stroke.id}
+                className={`stroke-list-item${i >= step ? ' stroke-list-item-pending' : ''}`}
+              >
                 <span className="stroke-list-index">{i + 1}</span>
                 <span
                   className="stroke-list-swatch"
