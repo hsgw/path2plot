@@ -34,3 +34,8 @@ export interface SvgParseResult {
   errors: SvgParseError[]
   viewBox: ViewBox
 }
+
+/** FR-14: 結合ブロック適用・並び替え後のストローク。blockIdが同じものは同一の結合ブロックに属する */
+export interface OrderedStroke extends ParsedStroke {
+  blockId: number
+}

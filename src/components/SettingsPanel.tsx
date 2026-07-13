@@ -13,6 +13,9 @@ interface SettingsPanelProps {
   gcodeSettings: GcodeSettings
   onGcodeSettingsChange: (settings: GcodeSettings) => void
   onGcodeInvalidChange: (labels: string[]) => void
+  /** FR-14: 端点結合距離(mm) */
+  joinDistanceMm: number
+  onJoinDistanceChange: (joinDistanceMm: number) => void
   canDownloadGcode: boolean
   boundsWarningCount: number
   onDownloadGcode: () => void
@@ -27,6 +30,8 @@ export function SettingsPanel({
   gcodeSettings,
   onGcodeSettingsChange,
   onGcodeInvalidChange,
+  joinDistanceMm,
+  onJoinDistanceChange,
   canDownloadGcode,
   boundsWarningCount,
   onDownloadGcode,
@@ -115,6 +120,19 @@ export function SettingsPanel({
                   'ベジェ折線化許容誤差',
                   valid,
                 )
+              }
+            />
+          </div>
+
+          <div className="settings-group">
+            <NumberField
+              label="端点結合距離(mm)"
+              value={joinDistanceMm}
+              min={0}
+              step={0.1}
+              onCommit={onJoinDistanceChange}
+              onValidityChange={(valid) =>
+                handleValidity('joinDistanceMm', '端点結合距離', valid)
               }
             />
           </div>

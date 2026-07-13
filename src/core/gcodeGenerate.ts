@@ -1,8 +1,12 @@
 import type { Point } from '../types/geometry'
 import type { GcodeSettings } from '../types/gcode'
-import type { ParsedStroke } from '../types/svg'
 import { renderGcodeTemplate } from './gcodeTemplate'
 import { filterMinSegmentLength } from './segmentFilter'
+
+/** 1回のペンダウン〜ペンアップで連続描画する点列(結合ブロック、FR-14) */
+export interface DrawGroup {
+  points: Point[]
+}
 
 /** 数値を小数点以下3桁までに丸めてG-codeの座標・速度値として整形する */
 function fmt(n: number): string {
@@ -22,12 +26,13 @@ function toMachinePoint(p: Point, settings: GcodeSettings): Point {
 }
 
 /**
- * 単一ペン前提(ペン分割なし)で、Phase 2のストローク順のままG-codeを生成する(FR-29)。
- * 各ストロークは移動(G00)→ペンダウン(テンプレート)→描画(G01)→ペンアップ(テンプレート)の順で出力し、
- * 最小セグメント長(FR-34)による間引きを行う。開始・終了ブロックはテンプレートから展開する(FR-30)。
+ * 単一ペン前提(ペン分割なし)で、結合ブロック(FR-14)単位でG-codeを生成する(FR-29)。
+ * 各グループは移動(G00)→ペンダウン(テンプレート)→描画(G01、グループ内は結合されペンを上げない)→
+ * ペンアップ(テンプレート)の順で出力し、最小セグメント長(FR-34)による間引きを行う。
+ * 開始・終了ブロックはテンプレートから展開する(FR-30)。
  */
 export function generateGcode(
-  strokes: ParsedStroke[],
+  groups: DrawGroup[],
   settings: GcodeSettings,
 ): string {
   const lines: string[] = []
@@ -36,9 +41,9 @@ export function generateGcode(
     renderGcodeTemplate(settings.templates.start, { z: settings.travelZ }),
   )
 
-  for (const stroke of strokes) {
+  for (const group of groups) {
     const points = filterMinSegmentLength(
-      stroke.points,
+      group.points,
       settings.minSegmentLengthMm,
     )
     if (points.length < 2) continue

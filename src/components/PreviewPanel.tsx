@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react'
 import type { Point } from '../types/geometry'
-import type { ParsedStroke } from '../types/svg'
+import type { OrderedStroke } from '../types/svg'
 
 interface PreviewPanelProps {
-  strokes: ParsedStroke[]
+  strokes: OrderedStroke[]
   /** 想定描画可能領域(FR-35)の幅・高さ(mm)。プレビューはこの大きさを基準に固定表示する */
   bedWidthMm: number
   bedHeightMm: number
@@ -58,7 +58,7 @@ function drawDirectionArrow(
 /** 1本のストロークを実線で描画し、開始点の画面座標を返す */
 function strokeOutline(
   ctx: CanvasRenderingContext2D,
-  stroke: ParsedStroke,
+  stroke: OrderedStroke,
   toScreen: (p: Point) => Point,
   defaultColor: string,
 ): Point | null {
@@ -135,12 +135,14 @@ export function PreviewPanel({
       }
       ctx.restore()
 
-      // FR-25: ペンアップ移動経路(出現順での単純な移動)
+      // FR-25: ペンアップ移動経路。同一結合ブロック(FR-14)内の連続ストローク間はペンを
+      // 上げずに連続描画されるため、その区間は移動経路を描かない
       ctx.save()
       ctx.strokeStyle = '#e04949'
       ctx.lineWidth = 1
       ctx.setLineDash([4, 3])
       for (let i = 0; i < drawnStrokes.length - 1; i++) {
+        if (drawnStrokes[i].blockId === drawnStrokes[i + 1].blockId) continue
         const from = toScreen(drawnStrokes[i].points.at(-1)!)
         const to = toScreen(drawnStrokes[i + 1].points[0])
         ctx.beginPath()

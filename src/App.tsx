@@ -9,8 +9,14 @@ import { InvalidInputBanner } from './components/InvalidInputBanner'
 import { parseSvgFile } from './core/svgParser'
 import { checkStrokeBounds } from './core/boundsCheck'
 import { generateGcode } from './core/gcodeGenerate'
+import {
+  buildJoinedBlocks,
+  greedyOptimizeOrder,
+  joinOverrideKey,
+  materializeBlock,
+} from './core/strokeJoin'
 import { DEFAULT_GCODE_SETTINGS } from './types/gcode'
-import type { ParseSettings } from './types/svg'
+import type { OrderedStroke, ParseSettings } from './types/svg'
 
 const DEFAULT_SETTINGS: ParseSettings = {
   // Illustrator書き出しSVGの標準的な座標系(1 user unit = 1pt = 1/72インチ)に合わせた既定値
@@ -18,6 +24,10 @@ const DEFAULT_SETTINGS: ParseSettings = {
   scaleFactor: 1,
   bezierToleranceMm: 0.1,
 }
+
+// FR-14: 結合距離の既定値。本来はペン線幅から算出するが、ペン(レイヤー)概念導入(Phase7)前は
+// 常にフォールバック値の0.5mmを既定とする
+const DEFAULT_JOIN_DISTANCE_MM = 0.5
 
 const PLAY_INTERVAL_MS = 400
 
@@ -45,6 +55,76 @@ function App() {
   const strokes = parseResult?.strokes ?? []
   const fitKey = svgText === null ? null : String(loadId)
 
+  // FR-14: 端点結合(結合ブロック化)。距離閾値+個別上書きから毎回再計算する
+  const [joinDistanceMm, setJoinDistanceMm] = useState(DEFAULT_JOIN_DISTANCE_MM)
+  const [joinOverrides, setJoinOverrides] = useState<Map<string, boolean>>(
+    new Map(),
+  )
+  const blocks = useMemo(
+    () => buildJoinedBlocks(strokes, joinDistanceMm, joinOverrides),
+    [strokes, joinDistanceMm, joinOverrides],
+  )
+
+  // FR-15: 貪欲法による並び替え結果(「最適化」ボタン押下時のみ設定)。
+  // ブロック構成が変わるような幾何変更(ファイル再読込・結合距離変更等)が起きたら破棄する
+  const [optimizedOrder, setOptimizedOrder] = useState<{
+    order: number[]
+    reversed: boolean[]
+  } | null>(null)
+  useEffect(() => {
+    setOptimizedOrder(null)
+  }, [blocks])
+  useEffect(() => {
+    setJoinOverrides(new Map())
+  }, [fitKey])
+
+  const blockOrder = useMemo(
+    () => optimizedOrder?.order ?? blocks.map((_, i) => i),
+    [optimizedOrder, blocks],
+  )
+  const blockReversedFlags = useMemo(
+    () => optimizedOrder?.reversed ?? blocks.map(() => false),
+    [optimizedOrder, blocks],
+  )
+  const materialized = useMemo(
+    () =>
+      blockOrder.map((blockIdx, i) =>
+        materializeBlock(blocks[blockIdx], strokes, blockReversedFlags[i]),
+      ),
+    [blockOrder, blockReversedFlags, blocks, strokes],
+  )
+  const orderedStrokes: OrderedStroke[] = useMemo(
+    () =>
+      materialized.flatMap((m, blockId) =>
+        m.strokes.map((s) => ({ ...s, blockId })),
+      ),
+    [materialized],
+  )
+  const drawGroups = useMemo(
+    () => materialized.map((m) => ({ points: m.points })),
+    [materialized],
+  )
+
+  const handleOptimize = (): void => {
+    const units = blocks.map((b) => materializeBlock(b, strokes, false))
+    setOptimizedOrder(greedyOptimizeOrder(units, { x: 0, y: 0 }))
+  }
+  const handleResetOrder = (): void => {
+    setOptimizedOrder(null)
+    setJoinOverrides(new Map())
+  }
+  const handleSetJoinOverride = (
+    idA: string,
+    idB: string,
+    join: boolean,
+  ): void => {
+    setJoinOverrides((prev) => {
+      const next = new Map(prev)
+      next.set(joinOverrideKey(idA, idB), join)
+      return next
+    })
+  }
+
   // FR-38/NFR-3: 描画可能領域からのはみ出し検出。解消するまでG-codeのダウンロードをブロックする
   const boundsWarnings = useMemo(
     () =>
@@ -61,7 +141,7 @@ function App() {
 
   const handleDownloadGcode = (): void => {
     if (!canDownloadGcode) return
-    const gcode = generateGcode(strokes, gcodeSettings)
+    const gcode = generateGcode(drawGroups, gcodeSettings)
     const blob = new Blob([gcode], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -121,12 +201,14 @@ function App() {
           gcodeSettings={gcodeSettings}
           onGcodeSettingsChange={setGcodeSettings}
           onGcodeInvalidChange={setGcodeInvalidLabels}
+          joinDistanceMm={joinDistanceMm}
+          onJoinDistanceChange={setJoinDistanceMm}
           canDownloadGcode={canDownloadGcode}
           boundsWarningCount={boundsWarnings.length}
           onDownloadGcode={handleDownloadGcode}
         />
         <PreviewPanel
-          strokes={strokes}
+          strokes={orderedStrokes}
           bedWidthMm={gcodeSettings.bedWidthMm}
           bedHeightMm={gcodeSettings.bedHeightMm}
           step={step}
@@ -137,7 +219,14 @@ function App() {
           }}
           onTogglePlaying={() => setPlaying((p) => !p)}
         />
-        <StrokeListPanel strokes={strokes} step={step} />
+        <StrokeListPanel
+          strokes={orderedStrokes}
+          step={step}
+          joinOverrides={joinOverrides}
+          onSetJoinOverride={handleSetJoinOverride}
+          onOptimize={handleOptimize}
+          onResetOrder={handleResetOrder}
+        />
       </div>
     </div>
   )

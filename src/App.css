@@ -221,3 +221,40 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* FR-14: 同一結合ブロック内の行を左ボーダーでグルーピング表示する */
+.stroke-list-item-joined {
+  border-left: 2px solid var(--text);
+  margin-left: 2px;
+  padding-left: 6px;
+}
+
+.stroke-list-order-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.stroke-list-order-controls button {
+  font-size: 11px;
+}
+
+.stroke-join-toggle-row {
+  list-style: none;
+  display: flex;
+  justify-content: center;
+}
+
+.stroke-join-toggle {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.stroke-join-toggle-joined {
+  color: var(--text-h);
+  border-color: var(--text-h);
+}
