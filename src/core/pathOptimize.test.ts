@@ -5,7 +5,7 @@ import {
   greedyOptimizeOrder,
   joinOverrideKey,
   materializeBlock,
-} from './strokeJoin'
+} from './pathOptimize'
 
 function stroke(id: string, points: [number, number][]): ParsedStroke {
   return {

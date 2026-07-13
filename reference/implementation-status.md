@@ -160,7 +160,7 @@
 **メモ**
 
 - サブパス(M区切り)へのストローク分解自体はPhase 1時点で`pathGeometry.ts`の`pathCommandsToPolylines`にすでに実装済みだったため、Phase 2ではこのロジックへのユニットテスト(`pathGeometry.test.ts`)追加とUI側(リスト・プレビュー)の実装が主な作業になった
-- `ParsedStroke`に`color`(FR-26用、strokeが可視ならstroke色・そうでなければfill色)を追加。色解決ロジックは`colorResolve.ts`の`resolveDisplayColor`に実装
+- `ParsedStroke`に`color`(FR-26用、strokeが可視ならstroke色・そうでなければfill色)を追加。色解決ロジックは`colorResolve.ts`の`resolveDisplayColor`に実装(同ファイルはstyle属性パース・display:none判定・stroke/fill継承カスケードまで扱う内容だったため、2026-07-13に`styleResolve.ts`へリネーム)
 - ステップ実行プレビューの状態(何本描画済みか)は当初`PreviewPanel`内のローカルstateだったが、**UIリファクタリング(2026-07-13)**で`App.tsx`にホイストし、`PreviewPanel`をcontrolled componentに変更(`StrokeListPanel`側でも同じstepを使って描画済み/未描画を表示するため)。新規ファイル読込時(`fitKey`変化時)のリセット先を「ステップ0」→「最終ステップ(全ストローク描画済み)」に変更し、読込み直後にプレビューが空に見える問題を解消。さらにステップを戻しても全体像を失わないよう、全ストロークを薄いアルファ値(0.2)で常時背景描画する「ゴースト表示」を追加。DPI/許容誤差等の設定変更でストローク数が変わった場合は範囲内にクランプするのみで、ステップ位置自体は極力保持する方針は変更なし(Phase2時点ではFR-39の手動編集リセット対象にステップ位置は含まれないため)
 - **UIリファクタリング(2026-07-13)**: `StrokeListPanel`の各行に、現在のステップより後(未描画)のストロークを薄く表示する(`stroke-list-item-pending`、opacity0.35)機能を追加。パスリストとプレビューの対応関係を分かりやすくする軽量対応。クリック/ホバーでの相互ハイライト(FR-43)は今回は見送り
 - 開始点◯・方向矢印はスクリーン座標(px)側で固定サイズ描画とした(mm座標系で固定サイズにすると拡大率次第で見た目のサイズが変わってしまうため)
@@ -338,7 +338,7 @@ M2                                 ; プログラム終了
 
 **メモ(Phase4-1: FR-14/FR-15、2026-07-13)**
 
-- 新規 `src/core/strokeJoin.ts` に3つの関数を実装:
+- 新規 `src/core/pathOptimize.ts`(実装当初は`strokeJoin.ts`という名称だったが、端点結合以外にペンアップ移動最適化も含むため2026-07-13にリネーム)に3つの関数を実装:
   - `buildJoinedBlocks`: 全ストロークの端点同士の距離を距離昇順(強制結合の個別上書きは最優先)でグリーディに評価し、各端点は最大1回だけ使用・同一連結成分への再結合(閉ループ化)は回避という制約でチェーンを構成する。孤立ストロークは1要素の結合ブロックとして扱う
   - `materializeBlock`: 結合ブロックを実際の`ParsedStroke`列・連結済み点列に変換する。ブロック全体の向き反転(内部メンバー順序反転+各メンバーのreversedとXOR)にも対応
   - `greedyOptimizeOrder`: 開始点(0,0)から最近傍のブロックを逐次選択する貪欲法(FR-15)。O(n²)

@@ -12,7 +12,7 @@ import {
   parseStyleDeclarations,
   resolveDisplayColor,
   type StrokeFillState,
-} from './colorResolve'
+} from './styleResolve'
 import {
   computeScaleMmPerUnit,
   svgToPrinterMatrix,

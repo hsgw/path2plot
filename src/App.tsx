@@ -14,7 +14,7 @@ import {
   greedyOptimizeOrder,
   joinOverrideKey,
   materializeBlock,
-} from './core/strokeJoin'
+} from './core/pathOptimize'
 import { DEFAULT_GCODE_SETTINGS } from './types/gcode'
 import type { OrderedStroke, ParseSettings } from './types/svg'
 

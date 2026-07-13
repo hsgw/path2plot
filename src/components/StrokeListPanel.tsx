@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react'
-import { joinOverrideKey } from '../core/strokeJoin'
+import { joinOverrideKey } from '../core/pathOptimize'
 import type { OrderedStroke } from '../types/svg'
 
 interface StrokeListPanelProps {
