@@ -4,7 +4,11 @@ import { SettingsPanel } from './components/SettingsPanel'
 import { PreviewPanel } from './components/PreviewPanel'
 import { StrokeListPanel } from './components/StrokeListPanel'
 import { ErrorBanner } from './components/ErrorBanner'
+import { BoundsWarningBanner } from './components/BoundsWarningBanner'
 import { parseSvgFile } from './core/svgParser'
+import { checkStrokeBounds } from './core/boundsCheck'
+import { generateGcode } from './core/gcodeGenerate'
+import { DEFAULT_GCODE_SETTINGS } from './types/gcode'
 import type { ParseSettings } from './types/svg'
 
 const DEFAULT_SETTINGS: ParseSettings = {
@@ -20,6 +24,7 @@ function App() {
   const [fileName, setFileName] = useState<string | null>(null)
   const [loadId, setLoadId] = useState(0)
   const [settings, setSettings] = useState<ParseSettings>(DEFAULT_SETTINGS)
+  const [gcodeSettings, setGcodeSettings] = useState(DEFAULT_GCODE_SETTINGS)
 
   const parseResult = useMemo(() => {
     if (svgText === null) return null
@@ -28,6 +33,29 @@ function App() {
 
   const strokes = parseResult?.strokes ?? []
   const fitKey = svgText === null ? null : String(loadId)
+
+  // FR-38/NFR-3: 描画可能領域からのはみ出し検出。解消するまでG-codeのダウンロードをブロックする
+  const boundsWarnings = useMemo(
+    () =>
+      checkStrokeBounds(strokes, {
+        widthMm: gcodeSettings.bedWidthMm,
+        heightMm: gcodeSettings.bedHeightMm,
+      }),
+    [strokes, gcodeSettings.bedWidthMm, gcodeSettings.bedHeightMm],
+  )
+  const canDownloadGcode = strokes.length > 0 && boundsWarnings.length === 0
+
+  const handleDownloadGcode = (): void => {
+    if (!canDownloadGcode) return
+    const gcode = generateGcode(strokes, gcodeSettings)
+    const blob = new Blob([gcode], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${(fileName ?? 'output').replace(/\.svg$/i, '')}.gcode`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   // FR-23: ステップ実行プレビュー。読込み直後は最終ステップ(全ストローク描画済み)を初期表示とする
   const [step, setStep] = useState(0)
@@ -63,6 +91,7 @@ function App() {
   return (
     <div className="app-shell">
       <ErrorBanner errors={parseResult?.errors ?? []} />
+      <BoundsWarningBanner warnings={boundsWarnings} />
       <div className="app-layout">
         <SettingsPanel
           fileName={fileName}
@@ -73,6 +102,11 @@ function App() {
             setLoadId((id) => id + 1)
           }}
           onSettingsChange={setSettings}
+          gcodeSettings={gcodeSettings}
+          onGcodeSettingsChange={setGcodeSettings}
+          canDownloadGcode={canDownloadGcode}
+          boundsWarningCount={boundsWarnings.length}
+          onDownloadGcode={handleDownloadGcode}
         />
         <PreviewPanel
           strokes={strokes}

@@ -81,6 +81,34 @@
   font-size: 13px;
 }
 
+.settings-group h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0 0 4px;
+}
+
+.settings-hint {
+  font-size: 11px;
+  color: var(--text);
+  margin: 0;
+}
+
+.settings-template-textarea {
+  width: 100%;
+  min-height: 60px;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.settings-warning-text {
+  font-size: 11px;
+  color: var(--error-text);
+  margin: 4px 0 0;
+}
+
 .settings-file-label input[type='file'] {
   font-size: 12px;
 }

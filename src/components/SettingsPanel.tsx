@@ -1,11 +1,18 @@
 import { useState } from 'react'
+import type { GcodeSettings } from '../types/gcode'
 import type { ParseSettings } from '../types/svg'
+import { GcodeSettingsPanel } from './GcodeSettingsPanel'
 
 interface SettingsPanelProps {
   fileName: string | null
   settings: ParseSettings
   onFileSelected: (text: string, fileName: string) => void
   onSettingsChange: (settings: ParseSettings) => void
+  gcodeSettings: GcodeSettings
+  onGcodeSettingsChange: (settings: GcodeSettings) => void
+  canDownloadGcode: boolean
+  boundsWarningCount: number
+  onDownloadGcode: () => void
 }
 
 export function SettingsPanel({
@@ -13,6 +20,11 @@ export function SettingsPanel({
   settings,
   onFileSelected,
   onSettingsChange,
+  gcodeSettings,
+  onGcodeSettingsChange,
+  canDownloadGcode,
+  boundsWarningCount,
+  onDownloadGcode,
 }: SettingsPanelProps) {
   const [isOpen, setIsOpen] = useState(true)
 
@@ -95,6 +107,14 @@ export function SettingsPanel({
               />
             </label>
           </div>
+
+          <GcodeSettingsPanel
+            settings={gcodeSettings}
+            onSettingsChange={onGcodeSettingsChange}
+            canDownload={canDownloadGcode}
+            warningCount={boundsWarningCount}
+            onDownload={onDownloadGcode}
+          />
         </div>
       )}
     </section>
