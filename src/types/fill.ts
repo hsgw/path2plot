@@ -17,6 +17,8 @@ export interface FillCandidate {
  * 存在しないため、Phase5では常に不使用(フォールバック値のみを使う)。
  */
 export interface FillSettings {
+  /** falseの場合、fill付き閉パスがあっても塗りブロック(輪郭線・ハッチ線とも)を一切生成しない */
+  enabled: boolean
   angleDeg: number
   zigzag: boolean
   spacingMm: number
@@ -33,6 +35,7 @@ export interface FillSettings {
 }
 
 export const DEFAULT_FILL_SETTINGS: FillSettings = {
+  enabled: true,
   angleDeg: 45,
   zigzag: false,
   spacingMm: 0.5,

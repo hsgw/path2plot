@@ -66,6 +66,14 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
     expect(block.outlineLoops).toBeNull()
   })
 
+  it('enabled=falseの場合は塗りブロックを一切生成しない', () => {
+    const blocks = buildFillBlocks([candidate([SQUARE_10])], {
+      ...DEFAULT_FILL_SETTINGS,
+      enabled: false,
+    })
+    expect(blocks).toEqual([])
+  })
+
   it('zigzag設定によりhatchChainsの本数(連結度合い)が変わる', () => {
     const settingsBase = {
       ...DEFAULT_FILL_SETTINGS,

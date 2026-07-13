@@ -80,5 +80,6 @@ export function buildFillBlocks(
   candidates: FillCandidate[],
   settings: FillSettings,
 ): FillBlock[] {
+  if (!settings.enabled) return []
   return candidates.map((candidate) => buildFillBlock(candidate, settings))
 }
