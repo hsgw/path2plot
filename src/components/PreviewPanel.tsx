@@ -4,8 +4,9 @@ import type { ParsedStroke } from '../types/svg'
 
 interface PreviewPanelProps {
   strokes: ParsedStroke[]
-  /** ファイルが差し替わったときだけビューのフィット(拡大縮小・中心合わせ)をやり直すためのキー */
-  fitKey: string | null
+  /** 想定描画可能領域(FR-35)の幅・高さ(mm)。プレビューはこの大きさを基準に固定表示する */
+  bedWidthMm: number
+  bedHeightMm: number
   /** FR-23: ステップ実行プレビュー。描画済みのストローク本数(0..strokes.length) */
   step: number
   playing: boolean
@@ -13,33 +14,10 @@ interface PreviewPanelProps {
   onTogglePlaying: () => void
 }
 
-interface Bounds {
-  minX: number
-  minY: number
-  maxX: number
-  maxY: number
-}
-
 const START_MARKER_RADIUS_PX = 4
 const ARROW_SIZE_PX = 5
 const GHOST_ALPHA = 0.2
-
-function computeBounds(strokes: ParsedStroke[]): Bounds | null {
-  if (strokes.length === 0) return null
-  let minX = Infinity
-  let minY = Infinity
-  let maxX = -Infinity
-  let maxY = -Infinity
-  for (const stroke of strokes) {
-    for (const p of stroke.points) {
-      if (p.x < minX) minX = p.x
-      if (p.y < minY) minY = p.y
-      if (p.x > maxX) maxX = p.x
-      if (p.y > maxY) maxY = p.y
-    }
-  }
-  return { minX, minY, maxX, maxY }
-}
+const BED_FILL_COLOR = '#ffffff'
 
 /** FR-24: ストローク開始点の◯表示 */
 function drawStartMarker(ctx: CanvasRenderingContext2D, at: Point): void {
@@ -97,31 +75,19 @@ function strokeOutline(
 
 export function PreviewPanel({
   strokes,
-  fitKey,
+  bedWidthMm,
+  bedHeightMm,
   step,
   playing,
   onStep,
   onTogglePlaying,
 }: PreviewPanelProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  // 直近にフィット基準として採用したmm座標系の範囲。fitKeyが変わったときだけ更新する。
-  // これによりDPI/倍率設定を変えたときに(内容に合わせて毎回自動フィットするのではなく)
-  // 実際の見た目のサイズが連動して変化するようにする。
-  const fitBoundsRef = useRef<Bounds | null>(null)
-  const lastFitKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
     const canvas = canvasRef.current
     const container = canvas?.parentElement
     if (!canvas || !container) return
-
-    if (lastFitKeyRef.current !== fitKey) {
-      lastFitKeyRef.current = fitKey
-      fitBoundsRef.current = null
-    }
-    if (!fitBoundsRef.current) {
-      fitBoundsRef.current = computeBounds(strokes)
-    }
 
     const draw = (): void => {
       const dpr = window.devicePixelRatio || 1
@@ -135,11 +101,10 @@ export function PreviewPanel({
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.clearRect(0, 0, width, height)
 
-      const bounds = fitBoundsRef.current
-      if (!bounds || strokes.length === 0) return
-
-      const boundsWidth = Math.max(bounds.maxX - bounds.minX, 1e-6)
-      const boundsHeight = Math.max(bounds.maxY - bounds.minY, 1e-6)
+      // プレビューは想定描画可能領域(FR-35)の大きさを基準に固定表示する(DPI/倍率設定を変えても
+      // ビュー自体は拡大縮小されず、はみ出し具合がそのまま見た目に反映される)
+      const boundsWidth = Math.max(bedWidthMm, 1e-6)
+      const boundsHeight = Math.max(bedHeightMm, 1e-6)
       const padding = 20
       const scale = Math.min(
         (width - padding * 2) / boundsWidth,
@@ -149,9 +114,13 @@ export function PreviewPanel({
       const offsetY = (height - boundsHeight * scale) / 2
 
       const toScreen = (p: Point): Point => ({
-        x: offsetX + (p.x - bounds.minX) * scale,
-        y: height - (offsetY + (p.y - bounds.minY) * scale),
+        x: offsetX + p.x * scale,
+        y: height - (offsetY + p.y * scale),
       })
+
+      // 想定ベッドサイズの枠のみを白で塗り、外側はアプリ背景色のまま(CSS側で未設定にして透過させている)
+      ctx.fillStyle = BED_FILL_COLOR
+      ctx.fillRect(offsetX, offsetY, boundsWidth * scale, boundsHeight * scale)
 
       const drawnStrokes = strokes.slice(0, step)
       const defaultColor = getComputedStyle(canvas).color || '#000'
@@ -199,7 +168,7 @@ export function PreviewPanel({
     const observer = new ResizeObserver(draw)
     observer.observe(container)
     return () => observer.disconnect()
-  }, [strokes, fitKey, step])
+  }, [strokes, bedWidthMm, bedHeightMm, step])
 
   const total = strokes.length
 

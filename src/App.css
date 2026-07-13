@@ -64,7 +64,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--text-h);
+  /* 想定ベッドサイズの枠のみCanvas側で白塗りする(background未指定のままアプリ背景を透過させ、枠の外側と揃える) */
+  color: #1f2328;
 }
 
 .settings-group {
@@ -107,6 +108,11 @@
   font-size: 11px;
   color: var(--error-text);
   margin: 4px 0 0;
+}
+
+.number-field-invalid {
+  border-color: var(--error-border) !important;
+  outline-color: var(--error-border);
 }
 
 .settings-file-label input[type='file'] {

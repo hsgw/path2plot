@@ -5,6 +5,7 @@ import { PreviewPanel } from './components/PreviewPanel'
 import { StrokeListPanel } from './components/StrokeListPanel'
 import { ErrorBanner } from './components/ErrorBanner'
 import { BoundsWarningBanner } from './components/BoundsWarningBanner'
+import { InvalidInputBanner } from './components/InvalidInputBanner'
 import { parseSvgFile } from './core/svgParser'
 import { checkStrokeBounds } from './core/boundsCheck'
 import { generateGcode } from './core/gcodeGenerate'
@@ -12,7 +13,8 @@ import { DEFAULT_GCODE_SETTINGS } from './types/gcode'
 import type { ParseSettings } from './types/svg'
 
 const DEFAULT_SETTINGS: ParseSettings = {
-  dpi: 96,
+  // Illustrator書き出しSVGの標準的な座標系(1 user unit = 1pt = 1/72インチ)に合わせた既定値
+  dpi: 72,
   scaleFactor: 1,
   bezierToleranceMm: 0.1,
 }
@@ -25,6 +27,15 @@ function App() {
   const [loadId, setLoadId] = useState(0)
   const [settings, setSettings] = useState<ParseSettings>(DEFAULT_SETTINGS)
   const [gcodeSettings, setGcodeSettings] = useState(DEFAULT_GCODE_SETTINGS)
+  // 数値入力欄で不正な値が確定されたまま残っている項目のラベル一覧(設定列本体/G-code設定でそれぞれ集計)
+  const [settingsInvalidLabels, setSettingsInvalidLabels] = useState<string[]>(
+    [],
+  )
+  const [gcodeInvalidLabels, setGcodeInvalidLabels] = useState<string[]>([])
+  const invalidFieldLabels = useMemo(
+    () => [...settingsInvalidLabels, ...gcodeInvalidLabels],
+    [settingsInvalidLabels, gcodeInvalidLabels],
+  )
 
   const parseResult = useMemo(() => {
     if (svgText === null) return null
@@ -43,7 +54,10 @@ function App() {
       }),
     [strokes, gcodeSettings.bedWidthMm, gcodeSettings.bedHeightMm],
   )
-  const canDownloadGcode = strokes.length > 0 && boundsWarnings.length === 0
+  const canDownloadGcode =
+    strokes.length > 0 &&
+    boundsWarnings.length === 0 &&
+    invalidFieldLabels.length === 0
 
   const handleDownloadGcode = (): void => {
     if (!canDownloadGcode) return
@@ -92,6 +106,7 @@ function App() {
     <div className="app-shell">
       <ErrorBanner errors={parseResult?.errors ?? []} />
       <BoundsWarningBanner warnings={boundsWarnings} />
+      <InvalidInputBanner labels={invalidFieldLabels} />
       <div className="app-layout">
         <SettingsPanel
           fileName={fileName}
@@ -102,15 +117,18 @@ function App() {
             setLoadId((id) => id + 1)
           }}
           onSettingsChange={setSettings}
+          onSettingsInvalidChange={setSettingsInvalidLabels}
           gcodeSettings={gcodeSettings}
           onGcodeSettingsChange={setGcodeSettings}
+          onGcodeInvalidChange={setGcodeInvalidLabels}
           canDownloadGcode={canDownloadGcode}
           boundsWarningCount={boundsWarnings.length}
           onDownloadGcode={handleDownloadGcode}
         />
         <PreviewPanel
           strokes={strokes}
-          fitKey={fitKey}
+          bedWidthMm={gcodeSettings.bedWidthMm}
+          bedHeightMm={gcodeSettings.bedHeightMm}
           step={step}
           playing={playing}
           onStep={(next) => {

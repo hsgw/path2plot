@@ -1,8 +1,11 @@
+import { useEffect, useState } from 'react'
 import type { GcodeSettings, GcodeTemplates } from '../types/gcode'
+import { NumberField } from './NumberField'
 
 interface GcodeSettingsPanelProps {
   settings: GcodeSettings
   onSettingsChange: (settings: GcodeSettings) => void
+  onInvalidFieldsChange: (labels: string[]) => void
   canDownload: boolean
   warningCount: number
   onDownload: () => void
@@ -11,12 +14,27 @@ interface GcodeSettingsPanelProps {
 export function GcodeSettingsPanel({
   settings,
   onSettingsChange,
+  onInvalidFieldsChange,
   canDownload,
   warningCount,
   onDownload,
 }: GcodeSettingsPanelProps) {
-  const update = (patch: Partial<GcodeSettings>): void =>
-    onSettingsChange({ ...settings, ...patch })
+  const [invalidFields, setInvalidFields] = useState<Map<string, string>>(
+    new Map(),
+  )
+
+  useEffect(() => {
+    onInvalidFieldsChange(Array.from(invalidFields.values()))
+  }, [invalidFields, onInvalidFieldsChange])
+
+  const handleValidity = (key: string, label: string, valid: boolean): void => {
+    setInvalidFields((prev) => {
+      const next = new Map(prev)
+      if (valid) next.delete(key)
+      else next.set(key, label)
+      return next
+    })
+  }
 
   const updateTemplate = (key: keyof GcodeTemplates, value: string): void =>
     onSettingsChange({
@@ -29,17 +47,13 @@ export function GcodeSettingsPanel({
     key: keyof Omit<GcodeSettings, 'templates'>,
     step = 1,
   ) => (
-    <label>
-      {label}
-      <input
-        type="number"
-        step={step}
-        value={settings[key]}
-        onChange={(e) =>
-          update({ [key]: Number(e.target.value) || settings[key] })
-        }
-      />
-    </label>
+    <NumberField
+      label={label}
+      value={settings[key]}
+      step={step}
+      onCommit={(value) => onSettingsChange({ ...settings, [key]: value })}
+      onValidityChange={(valid) => handleValidity(key, label, valid)}
+    />
   )
 
   return (

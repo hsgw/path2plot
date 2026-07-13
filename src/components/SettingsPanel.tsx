@@ -1,15 +1,18 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { GcodeSettings } from '../types/gcode'
 import type { ParseSettings } from '../types/svg'
 import { GcodeSettingsPanel } from './GcodeSettingsPanel'
+import { NumberField } from './NumberField'
 
 interface SettingsPanelProps {
   fileName: string | null
   settings: ParseSettings
   onFileSelected: (text: string, fileName: string) => void
   onSettingsChange: (settings: ParseSettings) => void
+  onSettingsInvalidChange: (labels: string[]) => void
   gcodeSettings: GcodeSettings
   onGcodeSettingsChange: (settings: GcodeSettings) => void
+  onGcodeInvalidChange: (labels: string[]) => void
   canDownloadGcode: boolean
   boundsWarningCount: number
   onDownloadGcode: () => void
@@ -20,13 +23,31 @@ export function SettingsPanel({
   settings,
   onFileSelected,
   onSettingsChange,
+  onSettingsInvalidChange,
   gcodeSettings,
   onGcodeSettingsChange,
+  onGcodeInvalidChange,
   canDownloadGcode,
   boundsWarningCount,
   onDownloadGcode,
 }: SettingsPanelProps) {
   const [isOpen, setIsOpen] = useState(true)
+  const [invalidFields, setInvalidFields] = useState<Map<string, string>>(
+    new Map(),
+  )
+
+  useEffect(() => {
+    onSettingsInvalidChange(Array.from(invalidFields.values()))
+  }, [invalidFields, onSettingsInvalidChange])
+
+  const handleValidity = (key: string, label: string, valid: boolean): void => {
+    setInvalidFields((prev) => {
+      const next = new Map(prev)
+      if (valid) next.delete(key)
+      else next.set(key, label)
+      return next
+    })
+  }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const file = e.target.files?.[0]
@@ -60,57 +81,48 @@ export function SettingsPanel({
           </div>
 
           <div className="settings-group">
-            <label>
-              DPI
-              <input
-                type="number"
-                min={1}
-                step={1}
-                value={settings.dpi}
-                onChange={(e) =>
-                  onSettingsChange({
-                    ...settings,
-                    dpi: Number(e.target.value) || settings.dpi,
-                  })
-                }
-              />
-            </label>
-            <label>
-              倍率
-              <input
-                type="number"
-                min={0.001}
-                step={0.1}
-                value={settings.scaleFactor}
-                onChange={(e) =>
-                  onSettingsChange({
-                    ...settings,
-                    scaleFactor: Number(e.target.value) || settings.scaleFactor,
-                  })
-                }
-              />
-            </label>
-            <label>
-              ベジェ折線化許容誤差(mm)
-              <input
-                type="number"
-                min={0.001}
-                step={0.01}
-                value={settings.bezierToleranceMm}
-                onChange={(e) =>
-                  onSettingsChange({
-                    ...settings,
-                    bezierToleranceMm:
-                      Number(e.target.value) || settings.bezierToleranceMm,
-                  })
-                }
-              />
-            </label>
+            <NumberField
+              label="DPI"
+              value={settings.dpi}
+              min={1}
+              step={1}
+              onCommit={(dpi) => onSettingsChange({ ...settings, dpi })}
+              onValidityChange={(valid) => handleValidity('dpi', 'DPI', valid)}
+            />
+            <NumberField
+              label="倍率"
+              value={settings.scaleFactor}
+              min={0.001}
+              step={0.1}
+              onCommit={(scaleFactor) =>
+                onSettingsChange({ ...settings, scaleFactor })
+              }
+              onValidityChange={(valid) =>
+                handleValidity('scaleFactor', '倍率', valid)
+              }
+            />
+            <NumberField
+              label="ベジェ折線化許容誤差(mm)"
+              value={settings.bezierToleranceMm}
+              min={0.001}
+              step={0.01}
+              onCommit={(bezierToleranceMm) =>
+                onSettingsChange({ ...settings, bezierToleranceMm })
+              }
+              onValidityChange={(valid) =>
+                handleValidity(
+                  'bezierToleranceMm',
+                  'ベジェ折線化許容誤差',
+                  valid,
+                )
+              }
+            />
           </div>
 
           <GcodeSettingsPanel
             settings={gcodeSettings}
             onSettingsChange={onGcodeSettingsChange}
+            onInvalidFieldsChange={onGcodeInvalidChange}
             canDownload={canDownloadGcode}
             warningCount={boundsWarningCount}
             onDownload={onDownloadGcode}
