@@ -189,11 +189,11 @@ export function materializeBlock(
 
 /**
  * ペンアップ移動距離の最小化を目的とした貪欲法(最近傍逐次選択)による並び替え(FR-15)。
- * 各ユニット(結合ブロックまたは単独ストローク)は始点・終点のどちらが現在地に近いかで
- * 採用方向を決める。O(n^2)。
+ * 各ユニット(結合ブロック・単独ストローク・塗りブロック共通)は始点・終点のどちらが現在地に
+ * 近いかで採用方向を決める。O(n^2)。
  */
 export function greedyOptimizeOrder(
-  units: { points: Point[] }[],
+  units: { start: Point; end: Point }[],
   start: Point,
 ): { order: number[]; reversed: boolean[] } {
   const remaining = units.map((_, i) => i)
@@ -207,9 +207,9 @@ export function greedyOptimizeOrder(
     let bestDistance = Infinity
 
     for (let k = 0; k < remaining.length; k++) {
-      const pts = units[remaining[k]].points
-      const dStart = dist(current, pts[0])
-      const dEnd = dist(current, pts.at(-1)!)
+      const unit = units[remaining[k]]
+      const dStart = dist(current, unit.start)
+      const dEnd = dist(current, unit.end)
       if (dStart < bestDistance) {
         bestDistance = dStart
         bestPos = k
@@ -223,10 +223,10 @@ export function greedyOptimizeOrder(
     }
 
     const chosenIdx = remaining[bestPos]
-    const pts = units[chosenIdx].points
+    const unit = units[chosenIdx]
     order.push(chosenIdx)
     reversed.push(bestReversed)
-    current = bestReversed ? pts[0] : pts.at(-1)!
+    current = bestReversed ? unit.start : unit.end
     remaining.splice(bestPos, 1)
   }
 

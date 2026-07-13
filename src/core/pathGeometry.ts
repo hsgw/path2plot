@@ -27,6 +27,12 @@ export function transformPathCommands(
   })
 }
 
+/** M区切りのサブパス1本分。closedは明示的なZコマンドで閉じられた場合のみtrue(始点=終点の一致からの推測はしない) */
+export interface Polyline {
+  points: Point[]
+  closed: boolean
+}
+
 /**
  * 変換済み(最終的な描画空間の単位)PathCommand列を、M区切りのサブパスごとの点列へ分解する。
  * toleranceは点列と同じ空間の単位(mm)で指定する。
@@ -34,15 +40,17 @@ export function transformPathCommands(
 export function pathCommandsToPolylines(
   commands: PathCommand[],
   tolerance: number,
-): Point[][] {
-  const result: Point[][] = []
+): Polyline[] {
+  const result: Polyline[] = []
   let current: Point[] = []
   let subpathStart: Point | null = null
   let lastPoint: Point | null = null
+  let closed = false
 
   const finishSubpath = (): void => {
-    if (current.length >= 2) result.push(current)
+    if (current.length >= 2) result.push({ points: current, closed })
     current = []
+    closed = false
   }
 
   for (const cmd of commands) {
@@ -80,6 +88,7 @@ export function pathCommandsToPolylines(
           current.push(subpathStart)
         }
         lastPoint = subpathStart
+        closed = true
         finishSubpath()
         break
       }

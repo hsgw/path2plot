@@ -1,4 +1,5 @@
 import type { Matrix2D, ViewBox } from '../types/geometry'
+import type { FillCandidate } from '../types/fill'
 import type {
   ParseSettings,
   ParsedStroke,
@@ -9,8 +10,9 @@ import {
   computeStrokeFillState,
   hasVisibleStrokeOrFill,
   isDisplayNone,
+  isFillVisible,
+  isStrokeVisible,
   parseStyleDeclarations,
-  resolveDisplayColor,
   type StrokeFillState,
 } from './styleResolve'
 import {
@@ -202,6 +204,7 @@ function walk(
   counter: { value: number },
   toleranceMm: number,
   strokes: ParsedStroke[],
+  fillCandidates: FillCandidate[],
   errors: SvgParseError[],
 ): void {
   const tag = el.tagName
@@ -250,6 +253,7 @@ function walk(
         counter,
         toleranceMm,
         strokes,
+        fillCandidates,
         errors,
       )
     }
@@ -275,16 +279,35 @@ function walk(
 
   const transformed = transformPathCommands(localCommands, matrix)
   const polylines = pathCommandsToPolylines(transformed, toleranceMm)
-  const color = resolveDisplayColor(strokeFillState)
 
-  for (const points of polylines) {
-    if (points.length < 2) continue
-    strokes.push({
-      id: `stroke-${strokes.length}`,
-      sourceId: elementId,
-      points,
-      color,
-    })
+  // FR-16: stroke/fillは独立に判定する(両方可視な要素は輪郭のストロークと塗りの両方を生成する)。
+  // strokeが可視な要素は全subpath(開・閉とも)をストロークとして描画する。
+  // fillが可視な要素は、閉subpathのみFillCandidate(塗りブロック)化する
+  // (開いたsubpathはFR-16の閉パス自動検出の対象外のため、fill専用ではドロップする)
+  if (isStrokeVisible(strokeFillState)) {
+    for (const { points } of polylines) {
+      if (points.length < 2) continue
+      strokes.push({
+        id: `stroke-${strokes.length}`,
+        sourceId: elementId,
+        points,
+        color: strokeFillState.stroke,
+      })
+    }
+  }
+  if (isFillVisible(strokeFillState)) {
+    const closedContours = polylines
+      .filter((p) => p.closed && p.points.length >= 2)
+      .map((p) => p.points)
+    if (closedContours.length > 0) {
+      fillCandidates.push({
+        id: `fill-${fillCandidates.length}`,
+        sourceId: elementId,
+        fillColor: strokeFillState.fill,
+        fillRule: strokeFillState.fillRule,
+        contours: closedContours,
+      })
+    }
   }
 }
 
@@ -301,6 +324,7 @@ export function parseSvgFile(
     const { line, column } = extractLineColumn(message)
     return {
       strokes: [],
+      fillCandidates: [],
       errors: [{ kind: 'parse-error', message: message.trim(), line, column }],
       viewBox: { minX: 0, minY: 0, width: 0, height: 0 },
     }
@@ -314,6 +338,7 @@ export function parseSvgFile(
   const registry = buildDefinitionRegistry(doc)
   const counter = { value: 0 }
   const strokes: ParsedStroke[] = []
+  const fillCandidates: FillCandidate[] = []
   const errors: SvgParseError[] = []
 
   for (const child of Array.from(svgEl.children)) {
@@ -324,9 +349,10 @@ export function parseSvgFile(
       counter,
       settings.bezierToleranceMm,
       strokes,
+      fillCandidates,
       errors,
     )
   }
 
-  return { strokes, errors, viewBox }
+  return { strokes, fillCandidates, errors, viewBox }
 }

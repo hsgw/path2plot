@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { GcodeSettings } from '../types/gcode'
+import type { FillSettings } from '../types/fill'
 import type { ParseSettings } from '../types/svg'
+import { FillSettingsPanel } from './FillSettingsPanel'
 import { GcodeSettingsPanel } from './GcodeSettingsPanel'
 import { NumberField } from './NumberField'
 
@@ -16,6 +18,9 @@ interface SettingsPanelProps {
   /** FR-14: 端点結合距離(mm) */
   joinDistanceMm: number
   onJoinDistanceChange: (joinDistanceMm: number) => void
+  fillSettings: FillSettings
+  onFillSettingsChange: (settings: FillSettings) => void
+  onFillInvalidChange: (labels: string[]) => void
   canDownloadGcode: boolean
   boundsWarningCount: number
   onDownloadGcode: () => void
@@ -32,6 +37,9 @@ export function SettingsPanel({
   onGcodeInvalidChange,
   joinDistanceMm,
   onJoinDistanceChange,
+  fillSettings,
+  onFillSettingsChange,
+  onFillInvalidChange,
   canDownloadGcode,
   boundsWarningCount,
   onDownloadGcode,
@@ -136,6 +144,12 @@ export function SettingsPanel({
               }
             />
           </div>
+
+          <FillSettingsPanel
+            settings={fillSettings}
+            onSettingsChange={onFillSettingsChange}
+            onInvalidFieldsChange={onFillInvalidChange}
+          />
 
           <GcodeSettingsPanel
             settings={gcodeSettings}

@@ -1,6 +1,9 @@
+export type FillRule = 'nonzero' | 'evenodd'
+
 export interface StrokeFillState {
   stroke: string
   fill: string
+  fillRule: FillRule
   strokeWidth: number
   strokeOpacity: number
   fillOpacity: number
@@ -56,6 +59,7 @@ export function computeStrokeFillState(
 
   const strokeRaw = getPresentationValue(el, styleMap, 'stroke')
   const fillRaw = getPresentationValue(el, styleMap, 'fill')
+  const fillRuleRaw = getPresentationValue(el, styleMap, 'fill-rule')
   const strokeWidthRaw = getPresentationValue(el, styleMap, 'stroke-width')
   const strokeOpacityRaw = getPresentationValue(el, styleMap, 'stroke-opacity')
   const fillOpacityRaw = getPresentationValue(el, styleMap, 'fill-opacity')
@@ -63,6 +67,12 @@ export function computeStrokeFillState(
 
   const stroke = strokeRaw ?? parent?.stroke ?? 'none'
   const fill = fillRaw ?? parent?.fill ?? '#000000'
+  const fillRule: FillRule =
+    fillRuleRaw === 'evenodd'
+      ? 'evenodd'
+      : fillRuleRaw === 'nonzero'
+        ? 'nonzero'
+        : (parent?.fillRule ?? 'nonzero')
   const strokeWidth =
     strokeWidthRaw !== undefined
       ? parseFloat(strokeWidthRaw)
@@ -81,10 +91,18 @@ export function computeStrokeFillState(
     visible = false
   else if (visibilityRaw === 'visible') visible = true
 
-  return { stroke, fill, strokeWidth, strokeOpacity, fillOpacity, visible }
+  return {
+    stroke,
+    fill,
+    fillRule,
+    strokeWidth,
+    strokeOpacity,
+    fillOpacity,
+    visible,
+  }
 }
 
-function isStrokeVisible(state: StrokeFillState): boolean {
+export function isStrokeVisible(state: StrokeFillState): boolean {
   return (
     !isNoneOrTransparent(state.stroke) &&
     state.strokeWidth !== 0 &&
@@ -92,16 +110,11 @@ function isStrokeVisible(state: StrokeFillState): boolean {
   )
 }
 
-function isFillVisible(state: StrokeFillState): boolean {
+export function isFillVisible(state: StrokeFillState): boolean {
   return !isNoneOrTransparent(state.fill) && state.fillOpacity !== 0
 }
 
 /** FR-5: stroke/fillともに不可視(none・透明・幅0)な要素かどうか */
 export function hasVisibleStrokeOrFill(state: StrokeFillState): boolean {
   return isStrokeVisible(state) || isFillVisible(state)
-}
-
-/** FR-26: プレビュー表示に使う実際の色(strokeが可視ならstroke、そうでなければfill) */
-export function resolveDisplayColor(state: StrokeFillState): string {
-  return isStrokeVisible(state) ? state.stroke : state.fill
 }

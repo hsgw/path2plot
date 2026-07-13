@@ -1,14 +1,17 @@
 import { useEffect, useRef } from 'react'
 import type { Point } from '../types/geometry'
-import type { OrderedStroke } from '../types/svg'
+import type { PreviewSegment } from '../types/svg'
 
 interface PreviewPanelProps {
-  strokes: OrderedStroke[]
+  segments: PreviewSegment[]
+  /** segmentsのうち実際に描画済み表示する本数(FR-23: ステップはListEntry単位、セグメント単位ではない) */
+  visibleSegmentCount: number
   /** 想定描画可能領域(FR-35)の幅・高さ(mm)。プレビューはこの大きさを基準に固定表示する */
   bedWidthMm: number
   bedHeightMm: number
-  /** FR-23: ステップ実行プレビュー。描画済みのストローク本数(0..strokes.length) */
+  /** FR-23: ステップ実行プレビュー。ListEntry単位の現在位置・総数 */
   step: number
+  totalSteps: number
   playing: boolean
   onStep: (next: number) => void
   onTogglePlaying: () => void
@@ -19,7 +22,7 @@ const ARROW_SIZE_PX = 5
 const GHOST_ALPHA = 0.2
 const BED_FILL_COLOR = '#ffffff'
 
-/** FR-24: ストローク開始点の◯表示 */
+/** FR-24: 開始点の◯表示 */
 function drawStartMarker(ctx: CanvasRenderingContext2D, at: Point): void {
   ctx.beginPath()
   ctx.arc(at.x, at.y, START_MARKER_RADIUS_PX, 0, Math.PI * 2)
@@ -55,18 +58,18 @@ function drawDirectionArrow(
   ctx.fill()
 }
 
-/** 1本のストロークを実線で描画し、開始点の画面座標を返す */
+/** 1本のセグメントを実線で描画し、開始点の画面座標を返す */
 function strokeOutline(
   ctx: CanvasRenderingContext2D,
-  stroke: OrderedStroke,
+  segment: PreviewSegment,
   toScreen: (p: Point) => Point,
   defaultColor: string,
 ): Point | null {
-  if (stroke.points.length < 2) return null
-  ctx.strokeStyle = stroke.color || defaultColor
+  if (segment.points.length < 2) return null
+  ctx.strokeStyle = segment.color || defaultColor
   ctx.lineWidth = 1.5
   ctx.beginPath()
-  const [first, ...rest] = stroke.points.map(toScreen)
+  const [first, ...rest] = segment.points.map(toScreen)
   ctx.moveTo(first.x, first.y)
   for (const p of rest) ctx.lineTo(p.x, p.y)
   ctx.stroke()
@@ -74,10 +77,12 @@ function strokeOutline(
 }
 
 export function PreviewPanel({
-  strokes,
+  segments,
+  visibleSegmentCount,
   bedWidthMm,
   bedHeightMm,
   step,
+  totalSteps,
   playing,
   onStep,
   onTogglePlaying,
@@ -122,29 +127,29 @@ export function PreviewPanel({
       ctx.fillStyle = BED_FILL_COLOR
       ctx.fillRect(offsetX, offsetY, boundsWidth * scale, boundsHeight * scale)
 
-      const drawnStrokes = strokes.slice(0, step)
+      const drawnSegments = segments.slice(0, visibleSegmentCount)
       const defaultColor = getComputedStyle(canvas).color || '#000'
 
-      // ゴースト表示: ステップを戻しても全体像を失わないよう、全ストロークを薄く常時描画する
+      // ゴースト表示: ステップを戻しても全体像を失わないよう、全セグメントを薄く常時描画する
       ctx.save()
       ctx.globalAlpha = GHOST_ALPHA
       ctx.lineJoin = 'round'
       ctx.lineCap = 'round'
-      for (const stroke of strokes) {
-        strokeOutline(ctx, stroke, toScreen, defaultColor)
+      for (const segment of segments) {
+        strokeOutline(ctx, segment, toScreen, defaultColor)
       }
       ctx.restore()
 
-      // FR-25: ペンアップ移動経路。同一結合ブロック(FR-14)内の連続ストローク間はペンを
-      // 上げずに連続描画されるため、その区間は移動経路を描かない
+      // FR-25: ペンアップ移動経路。penLiftBefore=falseの区間(FR-14の結合ブロック内部)は
+      // 実際にペンを上げないため移動経路を描かない
       ctx.save()
       ctx.strokeStyle = '#e04949'
       ctx.lineWidth = 1
       ctx.setLineDash([4, 3])
-      for (let i = 0; i < drawnStrokes.length - 1; i++) {
-        if (drawnStrokes[i].blockId === drawnStrokes[i + 1].blockId) continue
-        const from = toScreen(drawnStrokes[i].points.at(-1)!)
-        const to = toScreen(drawnStrokes[i + 1].points[0])
+      for (let i = 0; i < drawnSegments.length - 1; i++) {
+        if (!drawnSegments[i + 1].penLiftBefore) continue
+        const from = toScreen(drawnSegments[i].points.at(-1)!)
+        const to = toScreen(drawnSegments[i + 1].points[0])
         ctx.beginPath()
         ctx.moveTo(from.x, from.y)
         ctx.lineTo(to.x, to.y)
@@ -152,17 +157,17 @@ export function PreviewPanel({
       }
       ctx.restore()
 
-      // FR-26: ストロークを実際の色で描画
+      // FR-26: 実際の色で描画
       ctx.lineJoin = 'round'
       ctx.lineCap = 'round'
-      for (const stroke of drawnStrokes) {
-        const first = strokeOutline(ctx, stroke, toScreen, defaultColor)
+      for (const segment of drawnSegments) {
+        const first = strokeOutline(ctx, segment, toScreen, defaultColor)
         if (!first) continue
 
         // FR-24: 開始点◯・描画方向の表示
-        ctx.fillStyle = stroke.color || defaultColor
+        ctx.fillStyle = segment.color || defaultColor
         drawStartMarker(ctx, first)
-        drawDirectionArrow(ctx, first, toScreen(stroke.points[1]))
+        drawDirectionArrow(ctx, first, toScreen(segment.points[1]))
       }
     }
 
@@ -170,9 +175,7 @@ export function PreviewPanel({
     const observer = new ResizeObserver(draw)
     observer.observe(container)
     return () => observer.disconnect()
-  }, [strokes, bedWidthMm, bedHeightMm, step])
-
-  const total = strokes.length
+  }, [segments, visibleSegmentCount, bedWidthMm, bedHeightMm])
 
   return (
     <section className="panel panel-preview">
@@ -188,20 +191,20 @@ export function PreviewPanel({
           </button>
           <button
             type="button"
-            onClick={() => onStep(Math.min(total, step + 1))}
-            disabled={step >= total}
+            onClick={() => onStep(Math.min(totalSteps, step + 1))}
+            disabled={step >= totalSteps}
           >
             次へ
           </button>
           <button
             type="button"
             onClick={onTogglePlaying}
-            disabled={total === 0}
+            disabled={totalSteps === 0}
           >
             {playing ? '停止' : '再生'}
           </button>
           <span className="preview-step-indicator">
-            {step} / {total}
+            {step} / {totalSteps}
           </span>
         </div>
       </div>

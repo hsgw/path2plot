@@ -5,18 +5,25 @@ import { PreviewPanel } from './components/PreviewPanel'
 import { StrokeListPanel } from './components/StrokeListPanel'
 import { ErrorBanner } from './components/ErrorBanner'
 import { BoundsWarningBanner } from './components/BoundsWarningBanner'
+import { FillErrorBanner } from './components/FillErrorBanner'
 import { InvalidInputBanner } from './components/InvalidInputBanner'
 import { parseSvgFile } from './core/svgParser'
 import { checkStrokeBounds } from './core/boundsCheck'
+import { buildFillBlocks } from './core/fillBlock'
 import { generateGcode } from './core/gcodeGenerate'
+import {
+  type DrawUnit,
+  materializeDrawUnit,
+  travelEndpoints,
+} from './core/drawUnit'
 import {
   buildJoinedBlocks,
   greedyOptimizeOrder,
   joinOverrideKey,
-  materializeBlock,
 } from './core/pathOptimize'
+import { DEFAULT_FILL_SETTINGS } from './types/fill'
 import { DEFAULT_GCODE_SETTINGS } from './types/gcode'
-import type { OrderedStroke, ParseSettings } from './types/svg'
+import type { ListEntry, ParseSettings, PreviewSegment } from './types/svg'
 
 const DEFAULT_SETTINGS: ParseSettings = {
   // Illustrator書き出しSVGの標準的な座標系(1 user unit = 1pt = 1/72インチ)に合わせた既定値
@@ -42,9 +49,14 @@ function App() {
     [],
   )
   const [gcodeInvalidLabels, setGcodeInvalidLabels] = useState<string[]>([])
+  const [fillInvalidLabels, setFillInvalidLabels] = useState<string[]>([])
   const invalidFieldLabels = useMemo(
-    () => [...settingsInvalidLabels, ...gcodeInvalidLabels],
-    [settingsInvalidLabels, gcodeInvalidLabels],
+    () => [
+      ...settingsInvalidLabels,
+      ...gcodeInvalidLabels,
+      ...fillInvalidLabels,
+    ],
+    [settingsInvalidLabels, gcodeInvalidLabels, fillInvalidLabels],
   )
 
   const parseResult = useMemo(() => {
@@ -53,7 +65,16 @@ function App() {
   }, [svgText, settings])
 
   const strokes = parseResult?.strokes ?? []
+  const fillCandidates = parseResult?.fillCandidates ?? []
   const fitKey = svgText === null ? null : String(loadId)
+
+  // FR-17〜21: 塗りつぶし(ハッチング)設定。ペン(レイヤー)概念導入(Phase7)前は、
+  // 全ての塗りブロックに共通の設定として全体で共有する(joinDistanceMmと同じ簡略化パターン)
+  const [fillSettings, setFillSettings] = useState(DEFAULT_FILL_SETTINGS)
+  const fillBlocks = useMemo(
+    () => buildFillBlocks(fillCandidates, fillSettings),
+    [fillCandidates, fillSettings],
+  )
 
   // FR-14: 端点結合(結合ブロック化)。距離閾値+個別上書きから毎回再計算する
   const [joinDistanceMm, setJoinDistanceMm] = useState(DEFAULT_JOIN_DISTANCE_MM)
@@ -65,49 +86,111 @@ function App() {
     [strokes, joinDistanceMm, joinOverrides],
   )
 
+  // FR-14の結合ブロックとFR-22の塗りブロックを、書き順並び替え(FR-15)の対象として1列に統合する
+  const units: DrawUnit[] = useMemo(
+    () => [
+      ...blocks.map((block): DrawUnit => ({ kind: 'joinedStroke', block })),
+      ...fillBlocks.map((fillBlock): DrawUnit => ({ kind: 'fill', fillBlock })),
+    ],
+    [blocks, fillBlocks],
+  )
+
   // FR-15: 貪欲法による並び替え結果(「最適化」ボタン押下時のみ設定)。
-  // ブロック構成が変わるような幾何変更(ファイル再読込・結合距離変更等)が起きたら破棄する
+  // ユニット構成が変わるような幾何変更(ファイル再読込・結合距離変更・塗り設定変更等)が
+  // 起きたら破棄する
   const [optimizedOrder, setOptimizedOrder] = useState<{
     order: number[]
     reversed: boolean[]
   } | null>(null)
   useEffect(() => {
     setOptimizedOrder(null)
-  }, [blocks])
+  }, [units])
   useEffect(() => {
     setJoinOverrides(new Map())
   }, [fitKey])
 
-  const blockOrder = useMemo(
-    () => optimizedOrder?.order ?? blocks.map((_, i) => i),
-    [optimizedOrder, blocks],
+  const unitOrder = useMemo(
+    () => optimizedOrder?.order ?? units.map((_, i) => i),
+    [optimizedOrder, units],
   )
-  const blockReversedFlags = useMemo(
-    () => optimizedOrder?.reversed ?? blocks.map(() => false),
-    [optimizedOrder, blocks],
+  const unitReversedFlags = useMemo(
+    () => optimizedOrder?.reversed ?? units.map(() => false),
+    [optimizedOrder, units],
   )
-  const materialized = useMemo(
+  const materializedUnits = useMemo(
     () =>
-      blockOrder.map((blockIdx, i) =>
-        materializeBlock(blocks[blockIdx], strokes, blockReversedFlags[i]),
+      unitOrder.map((unitIdx, i) =>
+        materializeDrawUnit(units[unitIdx], strokes, unitReversedFlags[i]),
       ),
-    [blockOrder, blockReversedFlags, blocks, strokes],
+    [unitOrder, unitReversedFlags, units, strokes],
   )
-  const orderedStrokes: OrderedStroke[] = useMemo(
+  const listEntries: ListEntry[] = useMemo(
     () =>
-      materialized.flatMap((m, blockId) =>
-        m.strokes.map((s) => ({ ...s, blockId })),
+      materializedUnits.flatMap((m, blockId): ListEntry[] => {
+        if (m.kind === 'joinedStroke') {
+          return m.strokes!.map((s) => ({ kind: 'stroke', blockId, ...s }))
+        }
+        const fb = m.fillBlock!
+        return [
+          {
+            kind: 'fill',
+            blockId,
+            id: fb.id,
+            sourceId: fb.sourceId,
+            color: fb.color,
+            hatchLineCount: fb.hatchChains.length,
+            hasOutline: fb.outlineLoops !== null,
+            error: fb.error,
+          },
+        ]
+      }),
+    [materializedUnits],
+  )
+  // segmentCountPerEntry[i]は、listEntries[i]がpreviewSegmentsにいくつの物理セグメントを
+  // 寄与するか(strokeは常に1、fillはgcodeSegments本数)。FR-23のステップ(ListEntry単位)を
+  // プレビューのセグメント単位に変換するために使う
+  const segmentCountPerEntry = useMemo(
+    () =>
+      materializedUnits.flatMap((m) =>
+        m.kind === 'joinedStroke'
+          ? m.strokes!.map(() => 1)
+          : [m.gcodeSegments.length],
       ),
-    [materialized],
+    [materializedUnits],
+  )
+  const previewSegments: PreviewSegment[] = useMemo(
+    () =>
+      materializedUnits.flatMap((m, blockId): PreviewSegment[] => {
+        if (m.kind === 'joinedStroke') {
+          return m.strokes!.map((s, idx) => ({
+            blockId,
+            points: s.points,
+            color: s.color,
+            penLiftBefore: idx === 0,
+          }))
+        }
+        return m.gcodeSegments.map((points) => ({
+          blockId,
+          points,
+          color: m.color,
+          penLiftBefore: true,
+        }))
+      }),
+    [materializedUnits],
   )
   const drawGroups = useMemo(
-    () => materialized.map((m) => ({ points: m.points })),
-    [materialized],
+    () =>
+      materializedUnits.flatMap((m) =>
+        m.gcodeSegments.map((points) => ({ points })),
+      ),
+    [materializedUnits],
   )
 
   const handleOptimize = (): void => {
-    const units = blocks.map((b) => materializeBlock(b, strokes, false))
-    setOptimizedOrder(greedyOptimizeOrder(units, { x: 0, y: 0 }))
+    const endpoints = units
+      .map((u) => materializeDrawUnit(u, strokes, false))
+      .map(travelEndpoints)
+    setOptimizedOrder(greedyOptimizeOrder(endpoints, { x: 0, y: 0 }))
   }
   const handleResetOrder = (): void => {
     setOptimizedOrder(null)
@@ -135,7 +218,7 @@ function App() {
     [strokes, gcodeSettings.bedWidthMm, gcodeSettings.bedHeightMm],
   )
   const canDownloadGcode =
-    strokes.length > 0 &&
+    (strokes.length > 0 || fillBlocks.length > 0) &&
     boundsWarnings.length === 0 &&
     invalidFieldLabels.length === 0
 
@@ -151,41 +234,53 @@ function App() {
     URL.revokeObjectURL(url)
   }
 
-  // FR-23: ステップ実行プレビュー。読込み直後は最終ステップ(全ストローク描画済み)を初期表示とする
+  // FR-23: ステップ実行プレビュー。ListEntry単位(塗りブロックは1ブロック=1ステップ)で数える。
+  // 読込み直後は最終ステップ(全リスト項目描画済み)を初期表示とする
   const [step, setStep] = useState(0)
   const [playing, setPlaying] = useState(false)
 
   useEffect(() => {
-    setStep(strokes.length)
+    setStep(listEntries.length)
     setPlaying(false)
   }, [fitKey])
 
   useEffect(() => {
-    setStep((s) => Math.min(s, strokes.length))
-  }, [strokes])
+    setStep((s) => Math.min(s, listEntries.length))
+  }, [listEntries])
 
   useEffect(() => {
     if (!playing) return
-    if (step >= strokes.length) {
+    if (step >= listEntries.length) {
       setPlaying(false)
       return
     }
     const timer = setInterval(() => {
       setStep((s) => {
-        if (s + 1 >= strokes.length) {
+        if (s + 1 >= listEntries.length) {
           setPlaying(false)
-          return strokes.length
+          return listEntries.length
         }
         return s + 1
       })
     }, PLAY_INTERVAL_MS)
     return () => clearInterval(timer)
-  }, [playing, step, strokes.length])
+  }, [playing, step, listEntries.length])
+
+  const visibleSegmentCount = useMemo(
+    () => segmentCountPerEntry.slice(0, step).reduce((a, b) => a + b, 0),
+    [segmentCountPerEntry, step],
+  )
+
+  const fillErrors = useMemo(
+    () => fillBlocks.flatMap((fb) => (fb.error ? [fb.error] : [])),
+    [fillBlocks],
+  )
 
   return (
     <div className="app-shell">
       <ErrorBanner errors={parseResult?.errors ?? []} />
       <BoundsWarningBanner warnings={boundsWarnings} />
+      <FillErrorBanner errors={fillErrors} />
       <InvalidInputBanner labels={invalidFieldLabels} />
       <div className="app-layout">
         <SettingsPanel
@@ -203,15 +298,20 @@ function App() {
           onGcodeInvalidChange={setGcodeInvalidLabels}
           joinDistanceMm={joinDistanceMm}
           onJoinDistanceChange={setJoinDistanceMm}
+          fillSettings={fillSettings}
+          onFillSettingsChange={setFillSettings}
+          onFillInvalidChange={setFillInvalidLabels}
           canDownloadGcode={canDownloadGcode}
           boundsWarningCount={boundsWarnings.length}
           onDownloadGcode={handleDownloadGcode}
         />
         <PreviewPanel
-          strokes={orderedStrokes}
+          segments={previewSegments}
+          visibleSegmentCount={visibleSegmentCount}
           bedWidthMm={gcodeSettings.bedWidthMm}
           bedHeightMm={gcodeSettings.bedHeightMm}
           step={step}
+          totalSteps={listEntries.length}
           playing={playing}
           onStep={(next) => {
             setPlaying(false)
@@ -220,7 +320,7 @@ function App() {
           onTogglePlaying={() => setPlaying((p) => !p)}
         />
         <StrokeListPanel
-          strokes={orderedStrokes}
+          entries={listEntries}
           step={step}
           joinOverrides={joinOverrides}
           onSetJoinOverride={handleSetJoinOverride}

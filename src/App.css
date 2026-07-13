@@ -82,6 +82,11 @@
   font-size: 13px;
 }
 
+.settings-group label.settings-checkbox-label {
+  flex-direction: row;
+  align-items: center;
+}
+
 .settings-group h3 {
   font-size: 12px;
   font-weight: 600;

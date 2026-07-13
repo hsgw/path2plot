@@ -1,10 +1,10 @@
 import { Fragment, useState } from 'react'
 import { joinOverrideKey } from '../core/pathOptimize'
-import type { OrderedStroke } from '../types/svg'
+import type { ListEntry, StrokeListEntry } from '../types/svg'
 
 interface StrokeListPanelProps {
-  strokes: OrderedStroke[]
-  /** FR-23のステップ実行プレビューと連動させ、未描画のストロークを薄く表示する */
+  entries: ListEntry[]
+  /** FR-23のステップ実行プレビューと連動させ、未描画の行を薄く表示する */
   step: number
   /** FR-14: 個別上書き(結合する/しない)の現在値 */
   joinOverrides: Map<string, boolean>
@@ -15,15 +15,15 @@ interface StrokeListPanelProps {
   onResetOrder: () => void
 }
 
-/** 隣接する2行の間に表示する結合状態トグル(FR-14の簡易な個別上書きUI) */
+/** 隣接する2行の間に表示する結合状態トグル(FR-14の簡易な個別上書きUI)。stroke行同士のみに表示する */
 function JoinToggle({
   a,
   b,
   joinOverrides,
   onSetJoinOverride,
 }: {
-  a: OrderedStroke
-  b: OrderedStroke
+  a: StrokeListEntry
+  b: StrokeListEntry
   joinOverrides: Map<string, boolean>
   onSetJoinOverride: (idA: string, idB: string, join: boolean) => void
 }) {
@@ -51,8 +51,38 @@ function JoinToggle({
   )
 }
 
+/** FR-22: 塗りブロックの行(常にブロック単位で1行のみ、個別ハッチ線は並び替え対象としない) */
+function FillRow({
+  entry,
+  pending,
+}: {
+  entry: Extract<ListEntry, { kind: 'fill' }>
+  pending: boolean
+}) {
+  const outlineLabel = entry.hasOutline ? '輪郭あり' : '輪郭なし'
+  return (
+    <li
+      className={`stroke-list-item stroke-list-item-fill${pending ? ' stroke-list-item-pending' : ''}`}
+    >
+      <span
+        className="stroke-list-swatch"
+        style={{ backgroundColor: entry.color }}
+      />
+      <span className="stroke-list-label">
+        🖌 塗りブロック({entry.hatchLineCount}本, {outlineLabel})
+        {entry.sourceId ? ` — id="${entry.sourceId}"` : ''}
+      </span>
+      {entry.error && (
+        <span className="stroke-list-fill-error" title={entry.error.message}>
+          ⚠ 形状破綻
+        </span>
+      )}
+    </li>
+  )
+}
+
 export function StrokeListPanel({
-  strokes,
+  entries,
   step,
   joinOverrides,
   onSetJoinOverride,
@@ -75,7 +105,7 @@ export function StrokeListPanel({
             <button
               type="button"
               onClick={onOptimize}
-              disabled={strokes.length === 0}
+              disabled={entries.length === 0}
             >
               最適化
             </button>
@@ -88,31 +118,40 @@ export function StrokeListPanel({
       {isOpen && (
         <div className="panel-body">
           <ol className="stroke-list">
-            {strokes.map((stroke, i) => {
-              const prev = strokes[i - 1]
-              const sameBlockAsPrev = prev && prev.blockId === stroke.blockId
+            {entries.map((entry, i) => {
+              const prev = entries[i - 1]
+              const sameBlockAsPrev =
+                prev && prev.kind === 'stroke' && entry.kind === 'stroke'
+                  ? prev.blockId === entry.blockId
+                  : false
               return (
-                <Fragment key={stroke.id}>
-                  {prev && (
-                    <JoinToggle
-                      a={prev}
-                      b={stroke}
-                      joinOverrides={joinOverrides}
-                      onSetJoinOverride={onSetJoinOverride}
-                    />
+                <Fragment key={entry.id}>
+                  {prev &&
+                    prev.kind === 'stroke' &&
+                    entry.kind === 'stroke' && (
+                      <JoinToggle
+                        a={prev}
+                        b={entry}
+                        joinOverrides={joinOverrides}
+                        onSetJoinOverride={onSetJoinOverride}
+                      />
+                    )}
+                  {entry.kind === 'fill' ? (
+                    <FillRow entry={entry} pending={i >= step} />
+                  ) : (
+                    <li
+                      className={`stroke-list-item${i >= step ? ' stroke-list-item-pending' : ''}${sameBlockAsPrev ? ' stroke-list-item-joined' : ''}`}
+                    >
+                      <span className="stroke-list-index">{i + 1}</span>
+                      <span
+                        className="stroke-list-swatch"
+                        style={{ backgroundColor: entry.color }}
+                      />
+                      <span className="stroke-list-label">
+                        {entry.sourceId ?? entry.id}
+                      </span>
+                    </li>
                   )}
-                  <li
-                    className={`stroke-list-item${i >= step ? ' stroke-list-item-pending' : ''}${sameBlockAsPrev ? ' stroke-list-item-joined' : ''}`}
-                  >
-                    <span className="stroke-list-index">{i + 1}</span>
-                    <span
-                      className="stroke-list-swatch"
-                      style={{ backgroundColor: stroke.color }}
-                    />
-                    <span className="stroke-list-label">
-                      {stroke.sourceId ?? stroke.id}
-                    </span>
-                  </li>
                 </Fragment>
               )
             })}
