@@ -5,6 +5,13 @@ import type { HighlightRange, PreviewSegment } from '../types/svg'
 interface PreviewPanelProps {
   fileName: string | null
   segments: PreviewSegment[]
+  /** タイトル欄に表示する本数の内訳(ストローク総数=通常ストローク+塗りブロック内の線) */
+  strokeCount: number
+  fillCount: number
+  fillStrokeCount: number
+  /** パス結合(FR-14)・書き順最適化(FR-15)が現在の内容に適用済みかどうか */
+  joinApplied: boolean
+  optimizeApplied: boolean
   /** segmentsのうち実際に描画済み表示する本数(FR-23: ステップはListEntry単位、セグメント単位ではない) */
   visibleSegmentCount: number
   /** FR-43: ストロークリストでホバー中/選択中の行に対応するセグメント範囲(未描画分も強調する) */
@@ -201,6 +208,11 @@ function drawPenLifts(
 function PreviewPanelImpl({
   fileName,
   segments,
+  strokeCount,
+  fillCount,
+  fillStrokeCount,
+  joinApplied,
+  optimizeApplied,
   visibleSegmentCount,
   hoverHighlight,
   selectedHighlight,
@@ -408,6 +420,17 @@ function PreviewPanelImpl({
         <div className="preview-title">
           <h2>プレビュー</h2>
           <span className="preview-filename">{fileName ?? 'ファイルなし'}</span>
+          {fileName !== null && (
+            <span className="preview-stats">
+              {strokeCount}本(フィル {fillCount}、フィル線 {fillStrokeCount}本)
+            </span>
+          )}
+          <span className="preview-flags">
+            {joinApplied && <span className="preview-flag">結合済み</span>}
+            {optimizeApplied && (
+              <span className="preview-flag">最適化済み</span>
+            )}
+          </span>
         </div>
         <div className="preview-step-controls">
           <button

@@ -229,6 +229,26 @@
   white-space: nowrap;
 }
 
+.preview-stats {
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.preview-flags {
+  display: flex;
+  gap: 4px;
+}
+
+.preview-flag {
+  font-size: 11px;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+
 .preview-step-controls {
   display: flex;
   align-items: center;

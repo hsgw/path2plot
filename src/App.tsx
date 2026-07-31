@@ -385,6 +385,27 @@ function App() {
       }),
     [materializedUnits],
   )
+  // プレビューのタイトル欄に出す本数の内訳。strokeCountは全ストローク総数(通常ストローク+
+  // 塗りブロック内の線)で、括弧内にその内数として塗りブロック数・塗りブロック内の線数を示す
+  const previewCounts = useMemo(() => {
+    let plainStrokeCount = 0
+    let fillCount = 0
+    let fillStrokeCount = 0
+    for (const m of materializedUnits) {
+      if (m.kind === 'joinedStroke') {
+        plainStrokeCount += m.strokes!.length
+      } else {
+        fillCount++
+        fillStrokeCount += m.gcodeSegments.length
+      }
+    }
+    return {
+      strokeCount: plainStrokeCount + fillStrokeCount,
+      fillCount,
+      fillStrokeCount,
+    }
+  }, [materializedUnits])
+
   const drawGroups = useMemo(
     () =>
       materializedUnits.flatMap((m) =>
@@ -581,6 +602,11 @@ function App() {
         <PreviewPanel
           fileName={fileName}
           segments={previewSegments}
+          strokeCount={previewCounts.strokeCount}
+          fillCount={previewCounts.fillCount}
+          fillStrokeCount={previewCounts.fillStrokeCount}
+          joinApplied={joinActivated}
+          optimizeApplied={optimizedOrder !== null}
           visibleSegmentCount={visibleSegmentCount}
           hoverHighlight={hoverHighlight}
           selectedHighlight={selectedHighlight}
