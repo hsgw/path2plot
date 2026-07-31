@@ -372,6 +372,15 @@ M2                                 ; プログラム終了
 - `greedyOptimizeOrder`(FR-15)は「最適化」ボタン押下時のみの処理であり今回のスコープ外としたため、O(n²)のまま
 - 詳細はPhase1のメモ(Web Worker化・進捗バー追加)を参照
 
+**メモ(パス結合の手動トリガー化、2026-07-31)**
+
+- 従来`buildJoinedBlocks`(端点結合、FR-14)はファイル読込直後・`joinDistanceMm`/個別上書き変更のたびに自動実行されていたが、ユーザー指示により「ファイル読込時に自動でパス結合(および最適化)を実行しない」仕様に変更した
+- `StrokeListPanel`のヘッダーに既存の「最適化」「順序をリセット」と並べて新規「パス結合」ボタンを追加。押下するまでは各ストロークを個別ブロック(未結合)として扱う(`buildJoinedBlocks(strokes, 0, 空Map)`はO(n)の単純変換のためメインスレッドで同期計算、Worker不要)。押下後は`joinDistanceMm`・個別上書き変更に追従して自動で再計算する(押下前の状態には戻らない限り再度ボタンを押す必要はない)。「最適化」(FR-15)はPhase4実装時から既にボタン押下時のみの実行だったため変更なし
+- `App.tsx`側は、押下時点の`parseResult`への参照(`joinActivatedFor`)を保持し、現在の`parseResult`と一致する間だけ結合処理を有効とみなす方式で実装した。ファイル再読込・パース設定(DPI等)変更で`parseResult`の参照が変われば自動的に無効化されるため、専用のリセットeffectは不要(effect経由のリセットだと同一コミット内で他のeffectが更新前の値を読んでしまうタイミング問題が起きうるため、この派生比較方式にした)
+- Worker(`processing.worker.ts`)へのリクエストを、従来の単一メッセージ(fill→joinを毎回セットで実行)から、`kind: 'fill' | 'join'`で完全に独立した2つのリクエスト系統に分離した。fillは`fillCandidates`/`fillSettings`の変化に追従して従来通り自動実行、joinは上記の通り明示トリガー制御下で実行する。`ProcessingRequest`/`ProcessingResponse`(`types/processing.ts`)もこれに合わせて`fill-done`/`join-done`のユニオン型に変更した
+- 「順序をリセット」ボタンは、`optimizedOrder`・`joinOverrides`に加えて`joinActivatedFor`もクリアするようにした(未結合状態まで戻す)
+- `tsc -b`・`oxlint`・`vitest run`(87件)で確認済み。Playwrightでの実機的なUI動作確認は未実施
+
 ---
 
 ## Phase 5: 塗りつぶし処理(ハッチング)

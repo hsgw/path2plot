@@ -23,7 +23,11 @@ import {
   materializeDrawUnit,
   travelEndpoints,
 } from './core/drawUnit'
-import { greedyOptimizeOrder, joinOverrideKey } from './core/pathOptimize'
+import {
+  buildJoinedBlocks,
+  greedyOptimizeOrder,
+  joinOverrideKey,
+} from './core/pathOptimize'
 import { type FillBlock, DEFAULT_FILL_SETTINGS } from './types/fill'
 import { DEFAULT_GCODE_SETTINGS } from './types/gcode'
 import type {
@@ -39,17 +43,21 @@ import type {
   ProcessingResponse,
 } from './types/processing'
 
-interface ProcessedResult {
+interface FillProcessedResult {
   /** この結果がどのparseResultに対して計算されたものかを示す参照。現在のparseResultと
-   * 一致する場合のみ有効な結果として扱う(ファイル切替直後、新しいstrokesに古いblocks/
-   * fillBlocksが紐付いてしまう不整合を防ぐ) */
+   * 一致する場合のみ有効な結果として扱う(ファイル切替直後、新しいstrokesに古いfillBlocksが
+   * 紐付いてしまう不整合を防ぐ) */
   parseResult: SvgParseResult
   fillBlocks: FillBlock[]
+}
+
+interface JoinProcessedResult {
+  /** FillProcessedResult.parseResultと同様の紐付け用参照 */
+  parseResult: SvgParseResult
   blocks: JoinedBlock[]
 }
 
 const EMPTY_FILL_BLOCKS: FillBlock[] = []
-const EMPTY_BLOCKS: JoinedBlock[] = []
 // 空Mapの参照を使い回すことで、リセット時にsetJoinOverridesが不要な再postMessageを
 // 引き起こさないようにする(ファイル読込ごとにWorkerが2回起動する不具合の解消)
 const EMPTY_JOIN_OVERRIDES: Map<string, boolean> = new Map()
@@ -108,30 +116,68 @@ function App() {
   const [joinOverrides, setJoinOverrides] =
     useState<Map<string, boolean>>(EMPTY_JOIN_OVERRIDES)
 
-  // 塗りブロック生成(buildFillBlocks)→端点結合(buildJoinedBlocks、FR-14)はいずれも重い処理のため、
+  // 塗りブロック生成(buildFillBlocks)・端点結合(buildJoinedBlocks、FR-14)はいずれも重い処理のため、
   // メインスレッドをブロックしないようWeb Workerにオフロードする。結果は「どのparseResultに対する
   // 計算か」とセットで保持し、現在のparseResultと一致する場合のみ有効な結果として扱う。
-  // isProcessingもこの一致比較から導出する(setStateで別管理すると、ファイル読込直後の1コミット内で
-  // 他のeffectがまだ更新前の値を読んでしまうタイミング問題が起きるため、派生値にして回避する)
-  const [processed, setProcessed] = useState<ProcessedResult | null>(null)
-  const isProcessing =
-    parseResult !== null && processed?.parseResult !== parseResult
+  // fillとjoinは互いに独立したリクエスト系統として扱う: fillは設定変更に追従して自動実行される一方、
+  // joinはファイル読込直後に自動実行せず「パス結合」ボタン押下時のみ実行する(読込直後にパス結合・
+  // 書き順最適化が勝手に走らないようにする、という要件のため)
+  const [fillProcessed, setFillProcessed] =
+    useState<FillProcessedResult | null>(null)
+  const isFillProcessing =
+    parseResult !== null && fillProcessed?.parseResult !== parseResult
   const fillBlocks =
-    processed?.parseResult === parseResult
-      ? processed.fillBlocks
+    fillProcessed?.parseResult === parseResult
+      ? fillProcessed.fillBlocks
       : EMPTY_FILL_BLOCKS
+
+  // joinActivatedForは「パス結合」ボタン押下時点のparseResultへの参照。現在のparseResultと
+  // 一致する間だけ結合処理が有効(=joinActivated)とみなす。ファイル再読込・パース設定変更で
+  // parseResultの参照が変わると自動的にfalseへ戻るため、専用のリセットeffectが不要
+  // (effect経由のリセットだと、同一コミット内で他のeffectが更新前の値を読んでしまう
+  // タイミング問題が起きうる)
+  const [joinActivatedFor, setJoinActivatedFor] =
+    useState<SvgParseResult | null>(null)
+  const joinActivated =
+    joinActivatedFor !== null && joinActivatedFor === parseResult
+  const [joinProcessed, setJoinProcessed] =
+    useState<JoinProcessedResult | null>(null)
+  const isJoinProcessing =
+    joinActivated &&
+    parseResult !== null &&
+    joinProcessed?.parseResult !== parseResult
+  // パス結合が未実行の間は、各ストロークを個別ブロックとして扱う(距離0・上書きなしでの
+  // buildJoinedBlocksはO(n)の単純な変換のためメインスレッドで同期的に計算できる)
+  const unjoinedBlocks = useMemo(
+    () => buildJoinedBlocks(strokes, 0, EMPTY_JOIN_OVERRIDES),
+    [strokes],
+  )
   const blocks =
-    processed?.parseResult === parseResult ? processed.blocks : EMPTY_BLOCKS
+    joinActivated && joinProcessed?.parseResult === parseResult
+      ? joinProcessed.blocks
+      : unjoinedBlocks
 
-  const [processingPhase, setProcessingPhase] =
-    useState<ProcessingPhase | null>(null)
-  const [processingPercent, setProcessingPercent] = useState(0)
+  const isProcessing = isFillProcessing || isJoinProcessing
+  const processingPhase: ProcessingPhase | null = isFillProcessing
+    ? 'fill'
+    : isJoinProcessing
+      ? 'join'
+      : null
+  const [fillProcessingPercent, setFillProcessingPercent] = useState(0)
+  const [joinProcessingPercent, setJoinProcessingPercent] = useState(0)
+  const processingPercent = isFillProcessing
+    ? fillProcessingPercent
+    : isJoinProcessing
+      ? joinProcessingPercent
+      : 0
 
-  // 設定変更のたびpostMessageし、返信のrequestIdが最新のリクエストと一致しない場合
+  // fill/joinそれぞれ独立にrequestIdを持ち、返信のrequestIdが最新のリクエストと一致しない場合
   // (設定を素早く連続変更した場合)は古い結果として無視する
   const workerRef = useRef<Worker | null>(null)
-  const requestIdRef = useRef(0)
-  const pendingRequestParseResultRef = useRef<SvgParseResult | null>(null)
+  const fillRequestIdRef = useRef(0)
+  const joinRequestIdRef = useRef(0)
+  const pendingFillParseResultRef = useRef<SvgParseResult | null>(null)
+  const pendingJoinParseResultRef = useRef<SvgParseResult | null>(null)
 
   useEffect(() => {
     const worker = new Worker(
@@ -141,47 +187,76 @@ function App() {
     workerRef.current = worker
     worker.onmessage = (event: MessageEvent<ProcessingResponse>) => {
       const message = event.data
-      if (message.requestId !== requestIdRef.current) return
       if (message.type === 'progress') {
-        setProcessingPhase(message.phase)
-        setProcessingPercent(message.percent)
+        if (message.phase === 'fill') {
+          if (message.requestId !== fillRequestIdRef.current) return
+          setFillProcessingPercent(message.percent)
+        } else {
+          if (message.requestId !== joinRequestIdRef.current) return
+          setJoinProcessingPercent(message.percent)
+        }
         return
       }
-      const forParseResult = pendingRequestParseResultRef.current
+      if (message.type === 'fill-done') {
+        if (message.requestId !== fillRequestIdRef.current) return
+        const forParseResult = pendingFillParseResultRef.current
+        if (forParseResult === null) return
+        setFillProcessed({
+          parseResult: forParseResult,
+          fillBlocks: message.fillBlocks,
+        })
+        return
+      }
+      if (message.requestId !== joinRequestIdRef.current) return
+      const forParseResult = pendingJoinParseResultRef.current
       if (forParseResult === null) return
-      setProcessed({
-        parseResult: forParseResult,
-        fillBlocks: message.fillBlocks,
-        blocks: message.blocks,
-      })
-      setProcessingPhase(null)
+      setJoinProcessed({ parseResult: forParseResult, blocks: message.blocks })
     }
     return () => worker.terminate()
   }, [])
 
   useEffect(() => {
     if (parseResult === null) {
-      setProcessed(null)
+      setFillProcessed(null)
       return
     }
     const worker = workerRef.current
     if (!worker) return
-    const requestId = ++requestIdRef.current
-    pendingRequestParseResultRef.current = parseResult
-    setProcessingPhase('fill')
-    setProcessingPercent(0)
+    const requestId = ++fillRequestIdRef.current
+    pendingFillParseResultRef.current = parseResult
+    setFillProcessingPercent(0)
     const request: ProcessingRequest = {
+      kind: 'fill',
       requestId,
-      strokes,
       fillCandidates,
       fillSettings,
+    }
+    worker.postMessage(request)
+    // fillCandidatesはparseResultからのみ導出される派生値(parseResultがnullでない限り
+    // 参照も安定)のため、依存配列はparseResultの変化のみで十分
+  }, [parseResult, fillSettings])
+
+  useEffect(() => {
+    if (!joinActivated || parseResult === null) return
+    const worker = workerRef.current
+    if (!worker) return
+    const requestId = ++joinRequestIdRef.current
+    pendingJoinParseResultRef.current = parseResult
+    setJoinProcessingPercent(0)
+    const request: ProcessingRequest = {
+      kind: 'join',
+      requestId,
+      strokes,
       joinDistanceMm,
       joinOverrides,
     }
     worker.postMessage(request)
-    // strokes/fillCandidatesはparseResultからのみ導出される派生値(parseResultがnullでない限り
-    // 参照も安定)のため、依存配列はparseResultの変化のみで十分
-  }, [parseResult, fillSettings, joinDistanceMm, joinOverrides])
+    // strokesはparseResultからのみ導出される派生値のため、依存配列はparseResultの変化のみで十分
+  }, [joinActivated, parseResult, joinDistanceMm, joinOverrides])
+
+  const handleJoinPaths = useCallback((): void => {
+    setJoinActivatedFor(parseResult)
+  }, [parseResult])
 
   // FR-14の結合ブロックとFR-22の塗りブロックを、書き順並び替え(FR-15)の対象として1列に統合する
   const units: DrawUnit[] = useMemo(
@@ -301,6 +376,7 @@ function App() {
   const handleResetOrder = useCallback((): void => {
     setOptimizedOrder(null)
     setJoinOverrides(EMPTY_JOIN_OVERRIDES)
+    setJoinActivatedFor(null)
   }, [])
   const handleSetJoinOverride = useCallback(
     (idA: string, idB: string, join: boolean): void => {
@@ -459,6 +535,8 @@ function App() {
           step={deferredStep}
           joinOverrides={joinOverrides}
           onSetJoinOverride={handleSetJoinOverride}
+          joinActivated={joinActivated}
+          onJoinPaths={handleJoinPaths}
           onOptimize={handleOptimize}
           onResetOrder={handleResetOrder}
         />

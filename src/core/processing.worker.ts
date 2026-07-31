@@ -7,20 +7,18 @@ function post(message: ProcessingResponse): void {
 }
 
 self.onmessage = (event: MessageEvent<ProcessingRequest>) => {
-  const {
-    requestId,
-    strokes,
-    fillCandidates,
-    fillSettings,
-    joinDistanceMm,
-    joinOverrides,
-  } = event.data
+  const request = event.data
 
-  post({ requestId, type: 'progress', phase: 'fill', percent: 0 })
-  const fillBlocks = buildFillBlocks(fillCandidates, fillSettings)
+  if (request.kind === 'fill') {
+    const { requestId, fillCandidates, fillSettings } = request
+    post({ requestId, type: 'progress', phase: 'fill', percent: 0 })
+    const fillBlocks = buildFillBlocks(fillCandidates, fillSettings)
+    post({ requestId, type: 'fill-done', fillBlocks })
+    return
+  }
 
-  post({ requestId, type: 'progress', phase: 'join', percent: 50 })
+  const { requestId, strokes, joinDistanceMm, joinOverrides } = request
+  post({ requestId, type: 'progress', phase: 'join', percent: 0 })
   const blocks = buildJoinedBlocks(strokes, joinDistanceMm, joinOverrides)
-
-  post({ requestId, type: 'done', fillBlocks, blocks })
+  post({ requestId, type: 'join-done', blocks })
 }
