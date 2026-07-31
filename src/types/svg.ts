@@ -48,7 +48,8 @@ export interface StrokeListEntry extends OrderedStroke {
   kind: 'stroke'
 }
 
-/** ストローク並び順リストの1行(FR-22: 塗りブロックは常にブロック単位で1行のみ) */
+/** ストローク並び順リストの1行(FR-22: 塗りブロックはFR-23のステップ上も常にブロック単位で1行のみ。
+ * hatchLineCount/outlineLoopCountは、リスト上でブロックを展開したときに表示する子行の本数) */
 export interface FillListEntry {
   kind: 'fill'
   blockId: number
@@ -56,7 +57,8 @@ export interface FillListEntry {
   sourceId?: string
   color: string
   hatchLineCount: number
-  hasOutline: boolean
+  /** drawOutline=falseやFR-20の形状破綻エラー時は0 */
+  outlineLoopCount: number
   error?: FillGeometryError
 }
 

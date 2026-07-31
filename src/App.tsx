@@ -320,7 +320,7 @@ function App() {
             sourceId: fb.sourceId,
             color: fb.color,
             hatchLineCount: fb.hatchChains.length,
-            hasOutline: fb.outlineLoops !== null,
+            outlineLoopCount: fb.outlineLoops?.length ?? 0,
             error: fb.error,
           },
         ]
