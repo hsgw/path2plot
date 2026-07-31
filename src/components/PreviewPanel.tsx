@@ -5,8 +5,9 @@ import type { HighlightRange, PreviewSegment } from '../types/svg'
 interface PreviewPanelProps {
   fileName: string | null
   segments: PreviewSegment[]
-  /** タイトル欄に表示する本数の内訳(ストローク総数=通常ストローク+塗りブロック内の線) */
+  /** タイトル欄に表示する本数の内訳(ストローク総数=通常ストローク+fill内の線) */
   strokeCount: number
+  /** fillブロック数と、その内訳であるfill内の線(輪郭線+ハッチ線)の本数 */
   fillCount: number
   fillStrokeCount: number
   /** パス結合(FR-14)・書き順最適化(FR-15)が現在の内容に適用済みかどうか */
@@ -422,7 +423,7 @@ function PreviewPanelImpl({
           <span className="preview-filename">{fileName ?? 'ファイルなし'}</span>
           {fileName !== null && (
             <span className="preview-stats">
-              {strokeCount}本(フィル {fillCount}、フィル線 {fillStrokeCount}本)
+              ストローク {strokeCount} フィル {fillCount} ({fillStrokeCount})
             </span>
           )}
           <span className="preview-flags">

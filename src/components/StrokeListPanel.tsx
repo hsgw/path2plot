@@ -1,9 +1,10 @@
 import {
-  Fragment,
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import { joinOverrideKey } from '../core/pathOptimize'
@@ -18,7 +19,7 @@ interface StrokeListPanelProps {
   entries: ListEntry[]
   /** FR-23のステップ実行プレビューと連動させ、未描画の行を薄く表示する */
   step: number
-  /** FR-14: 個別上書き(結合する/しない)の現在値 */
+  /** FR-14: 個別上書き(結合する/しない)の現在値。右クリックメニューの表示・操作に使う */
   joinOverrides: Map<string, boolean>
   onSetJoinOverride: (idA: string, idB: string, join: boolean) => void
   /** FR-43: クリックで選択中の行のキー(ホバー中の行はCSSの:hoverで表現するため受け取らない) */
@@ -29,7 +30,7 @@ interface StrokeListPanelProps {
 
 /**
  * FR-43のハイライト行キー。行の種別ごとに接頭辞を付け、同じidを持つ行
- * (結合ブロック行とその先頭ストローク行など)が衝突しないようにする
+ * (block行とその先頭ストローク行など)が衝突しないようにする
  */
 const strokeRowKey = (id: string): string => `stroke:${id}`
 const blockRowKey = (id: string): string => `block:${id}`
@@ -38,7 +39,7 @@ const fillChildRowKey = (id: string, segmentOffset: number): string =>
   `fillchild:${id}:${segmentOffset}`
 
 /**
- * FR-43: イベント委譲で、ホバー/クリックされた位置から対象行のハイライト情報を読み取る。
+ * FR-43: イベント委譲で、ホバー/クリック/右クリックされた位置から対象行のハイライト情報を読み取る。
  * 各行がdata-hl-*属性として持つ情報(プレビューのどのセグメントに対応するか)を復元する。
  * 行ごとにハンドラを持たせると、数万行のリストでクロージャ生成コストが無視できなくなるため、
  * リスト全体で1組のハンドラだけを使う
@@ -79,48 +80,184 @@ type ListGroup =
 // 参照を使い回し、展開状態リセット時に不要な再レンダを起こさないようにする
 const EMPTY_EXPANDED: ReadonlySet<string> = new Set()
 
-/**
- * 隣接する2行の間に表示する結合状態トグル(FR-14の簡易な個別上書きUI)。stroke行同士のみに表示する。
- * ブロックが畳まれている場合は、ブロック境界(前ブロックの末尾ストロークと次ブロックの先頭ストローク)
- * の間に表示され、クリックでブロック同士の結合/分割ができる。
- * memo化し、step変更(=pendingの変化)では再レンダされないようにする
- */
-const JoinToggle = memo(function JoinToggle({
-  a,
-  b,
-  joinOverrides,
-  onSetJoinOverride,
-}: {
+/** 右クリックメニューの表示状態。targetはFR-43のハイライトと同じ行識別情報 */
+interface ContextMenuState {
+  /** メニューを開いた位置(clientX/clientY) */
+  x: number
+  y: number
+  target: HighlightSelection
+}
+
+/** メニュー内の結合操作1つ分(対象行の前側/後側それぞれについて算出する) */
+interface JoinAction {
   a: StrokeListEntry
   b: StrokeListEntry
+  /** 現在この2本が同じblockに属しているか */
+  joined: boolean
+  /** FR-14の個別上書きが設定済みか(自動判定のままではないか) */
+  overridden: boolean
+}
+
+/**
+ * entries[index]とentries[index+1]がどちらもストローク行のときだけ、その隣接ペアに対する
+ * 結合操作を組み立てる(fillは結合の対象外)。
+ * 畳まれたblock行(entryCount>1)を対象にした場合も、この関数に渡すindexを選ぶことで
+ * ブロック境界のペア(前ブロックの末尾ストロークと次ブロックの先頭ストローク)になる
+ */
+function joinActionAt(
+  entries: ListEntry[],
+  index: number,
+  joinOverrides: Map<string, boolean>,
+): JoinAction | null {
+  const a = entries[index]
+  const b = entries[index + 1]
+  if (a === undefined || b === undefined) return null
+  if (a.kind !== 'stroke' || b.kind !== 'stroke') return null
+  return {
+    a,
+    b,
+    joined: a.blockId === b.blockId,
+    overridden: joinOverrides.has(joinOverrideKey(a.id, b.id)),
+  }
+}
+
+/** メニュー見出しに出す、操作対象の行の説明 */
+function describeRow(entries: ListEntry[], target: HighlightSelection): string {
+  const entry = entries[target.entryIndex]
+  if (entry === undefined) return ''
+  const no = `${target.entryIndex + 1}. `
+  if (entry.kind === 'fill') return `${no}fill`
+  if (target.entryCount > 1) return `${no}block(${target.entryCount}本)`
+  return `${no}${entry.sourceId ?? entry.id}`
+}
+
+/** 結合/未結合を切り替えるメニュー項目。隣接ストロークがない場合は無効化して理由を示す */
+function JoinMenuItem({
+  action,
+  position,
+  onSetJoinOverride,
+  onClose,
+}: {
+  action: JoinAction | null
+  /** 対象行から見てどちら側の隣接ペアか */
+  position: '前' | '次'
+  onSetJoinOverride: (idA: string, idB: string, join: boolean) => void
+  onClose: () => void
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      className="stroke-context-menu-item"
+      disabled={action === null}
+      title={
+        action === null
+          ? `${position}に結合できるストロークがありません(リストの端、またはfillが隣接している)`
+          : 'FR-14: 端点結合の個別上書き'
+      }
+      onClick={() => {
+        if (action === null) return
+        onSetJoinOverride(action.a.id, action.b.id, !action.joined)
+        onClose()
+      }}
+    >
+      <span>
+        {action?.joined
+          ? `${position}の行との結合を解除`
+          : `${position}の行と結合`}
+      </span>
+      {action?.overridden && (
+        <span className="stroke-context-menu-note">手動</span>
+      )}
+    </button>
+  )
+}
+
+/** FR-14: 結合/未結合の切り替えを行う右クリックメニュー(旧・行間の結合トグルの置き換え) */
+function StrokeContextMenu({
+  state,
+  entries,
+  joinOverrides,
+  onSetJoinOverride,
+  onClose,
+}: {
+  state: ContextMenuState
+  entries: ListEntry[]
   joinOverrides: Map<string, boolean>
   onSetJoinOverride: (idA: string, idB: string, join: boolean) => void
+  onClose: () => void
 }) {
-  const joined = a.blockId === b.blockId
-  const overridden = joinOverrides.has(joinOverrideKey(a.id, b.id))
-  const label = joined
-    ? overridden
-      ? '🔗 結合(手動)'
-      : '🔗 結合'
-    : overridden
-      ? '⋯ 未結合(手動)'
-      : '⋯ 未結合'
+  const menuRef = useRef<HTMLDivElement>(null)
+  const { target } = state
+  const prevAction = joinActionAt(entries, target.entryIndex - 1, joinOverrides)
+  const nextAction = joinActionAt(
+    entries,
+    target.entryIndex + target.entryCount - 1,
+    joinOverrides,
+  )
+
+  // 画面外へはみ出さないよう、実寸を測ってから位置を確定する(ペイント前に確定させたいのでlayout effect)
+  useLayoutEffect(() => {
+    const el = menuRef.current
+    if (!el) return
+    const { width, height } = el.getBoundingClientRect()
+    const x = Math.max(4, Math.min(state.x, window.innerWidth - width - 4))
+    const y = Math.max(4, Math.min(state.y, window.innerHeight - height - 4))
+    el.style.left = `${x}px`
+    el.style.top = `${y}px`
+  }, [state])
+
+  // メニュー外のクリック・スクロール・リサイズ・Escapeで閉じる。メニューを開いた右クリックの
+  // pointerdownはcontextmenuより前に発火済みのため、この購読で即座に閉じてしまうことはない
+  useEffect(() => {
+    const handlePointerDown = (e: PointerEvent): void => {
+      if (e.target instanceof Node && menuRef.current?.contains(e.target))
+        return
+      onClose()
+    }
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('pointerdown', handlePointerDown, true)
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('resize', onClose)
+    // リストをスクロールしたときにメニューだけ取り残されないよう、子要素のスクロールもcaptureで拾う
+    window.addEventListener('scroll', onClose, true)
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown, true)
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('resize', onClose)
+      window.removeEventListener('scroll', onClose, true)
+    }
+  }, [onClose])
 
   return (
-    <li className="stroke-join-toggle-row">
-      <button
-        type="button"
-        className={`stroke-join-toggle${joined ? ' stroke-join-toggle-joined' : ''}`}
-        onClick={() => onSetJoinOverride(a.id, b.id, !joined)}
-        title="クリックで結合する/しないを切り替え(FR-14の個別上書き)"
-      >
-        {label}
-      </button>
-    </li>
+    <div
+      ref={menuRef}
+      className="stroke-context-menu"
+      role="menu"
+      style={{ left: state.x, top: state.y }}
+    >
+      <div className="stroke-context-menu-header">
+        {describeRow(entries, target)}
+      </div>
+      <JoinMenuItem
+        action={prevAction}
+        position="前"
+        onSetJoinOverride={onSetJoinOverride}
+        onClose={onClose}
+      />
+      <JoinMenuItem
+        action={nextAction}
+        position="次"
+        onSetJoinOverride={onSetJoinOverride}
+        onClose={onClose}
+      />
+    </div>
   )
-})
+}
 
-/** ブロック行/塗りブロック行の開閉トグル。子を持たない行では同幅のスペーサーで桁を揃える */
+/** block行/fill行の開閉トグル。子を持たない行では同幅のスペーサーで桁を揃える */
 function ExpandToggle({
   expanded,
   onToggle,
@@ -174,8 +311,8 @@ const StrokeRow = memo(function StrokeRow({
 })
 
 /**
- * FR-14の結合ブロックの行。既定では中身(個別ストローク)を畳んだ1行として表示し、
- * 展開時のみ子ストローク行とブロック内部の結合トグルを描画する
+ * FR-14の結合ブロック(リスト上の表記はblock)の行。既定では中身(個別ストローク)を畳んだ
+ * 1行として表示し、展開時のみ子ストローク行を描画する
  */
 const BlockRow = memo(function BlockRow({
   groupKey,
@@ -184,8 +321,6 @@ const BlockRow = memo(function BlockRow({
   drawnCount,
   expanded,
   onToggleExpanded,
-  joinOverrides,
-  onSetJoinOverride,
 }: {
   groupKey: string
   entries: StrokeListEntry[]
@@ -195,8 +330,6 @@ const BlockRow = memo(function BlockRow({
   expanded: boolean
   /** 親から安定した参照で受け取る(行ごとにクロージャを作るとmemoが効かなくなるため) */
   onToggleExpanded: (key: string) => void
-  joinOverrides: Map<string, boolean>
-  onSetJoinOverride: (idA: string, idB: string, join: boolean) => void
 }) {
   const first = entries[0]
   const pending = drawnCount === 0
@@ -205,7 +338,7 @@ const BlockRow = memo(function BlockRow({
     <li className="stroke-list-block">
       <div
         className={`stroke-list-item stroke-list-item-block stroke-list-item-clickable${pending ? ' stroke-list-item-pending' : ''}${partial ? ' stroke-list-item-partial' : ''}`}
-        // FR-43: ブロック行のハイライトはブロック内の全ストロークが対象
+        // FR-43: block行のハイライトはブロック内の全ストロークが対象
         data-hl-key={blockRowKey(groupKey)}
         data-hl-index={startIndex}
         data-hl-count={entries.length}
@@ -220,28 +353,19 @@ const BlockRow = memo(function BlockRow({
           style={{ backgroundColor: first.color }}
         />
         <span className="stroke-list-label">
-          🔗 結合ブロック({entries.length}本)
+          🔗 block({entries.length}本)
           {first.sourceId ? ` — id="${first.sourceId}"` : ''}
         </span>
       </div>
       {expanded && (
         <ol className="stroke-list stroke-list-children">
           {entries.map((entry, i) => (
-            <Fragment key={entry.id}>
-              {i > 0 && (
-                <JoinToggle
-                  a={entries[i - 1]}
-                  b={entry}
-                  joinOverrides={joinOverrides}
-                  onSetJoinOverride={onSetJoinOverride}
-                />
-              )}
-              <StrokeRow
-                entry={entry}
-                index={startIndex + i}
-                pending={i >= drawnCount}
-              />
-            </Fragment>
+            <StrokeRow
+              key={entry.id}
+              entry={entry}
+              index={startIndex + i}
+              pending={i >= drawnCount}
+            />
           ))}
         </ol>
       )}
@@ -250,7 +374,7 @@ const BlockRow = memo(function BlockRow({
 })
 
 /**
- * 塗りブロックを展開したときの子行(輪郭線・ハッチ線)。FR-22によりこれらは並び替え・
+ * fill行を展開したときの子行(輪郭線・ハッチ線)。FR-22によりこれらは並び替え・
  * ステップの単位ではないため、通し番号(stroke-list-index)は持たず桁だけ揃える
  */
 function FillChildRow({
@@ -264,7 +388,7 @@ function FillChildRow({
   label: string
   entryId: string
   entryIndex: number
-  /** 塗りブロック内での物理セグメント番号(輪郭線→ハッチ線の並び順、drawUnitのgcodeSegmentsと同順) */
+  /** fill内での物理セグメント番号(輪郭線→ハッチ線の並び順、drawUnitのgcodeSegmentsと同順) */
   segmentOffset: number
 }) {
   return (
@@ -284,8 +408,8 @@ function FillChildRow({
 }
 
 /**
- * FR-22: 塗りブロックの行(FR-23のステップ上は常に1ブロック=1ステップ、個別ハッチ線は
- * 並び替え対象としない)。結合ブロックと同様、中身(輪郭線・ハッチ線)は既定で畳んでおく。memo化
+ * FR-22: 塗りブロック(リスト上の表記はfill)の行。FR-23のステップ上は常に1ブロック=1ステップで、
+ * 個別ハッチ線は並び替え対象としない。blockと同様、中身(輪郭線・ハッチ線)は既定で畳んでおく。memo化
  */
 const FillRow = memo(function FillRow({
   entry,
@@ -306,7 +430,7 @@ const FillRow = memo(function FillRow({
     <li className="stroke-list-block">
       <div
         className={`stroke-list-item stroke-list-item-fill stroke-list-item-clickable${pending ? ' stroke-list-item-pending' : ''}`}
-        // FR-43: 塗りブロック行のハイライトは輪郭線・ハッチ線を含むブロック全体が対象
+        // FR-43: fill行のハイライトは輪郭線・ハッチ線を含むブロック全体が対象
         data-hl-key={fillRowKey(entry.id)}
         data-hl-index={index}
         data-hl-count={1}
@@ -325,7 +449,7 @@ const FillRow = memo(function FillRow({
           style={{ backgroundColor: entry.color }}
         />
         <span className="stroke-list-label">
-          🖌 塗りブロック({entry.hatchLineCount}本,{' '}
+          🖌 fill({entry.hatchLineCount}本,{' '}
           {entry.outlineLoopCount > 0 ? '輪郭あり' : '輪郭なし'})
           {entry.sourceId ? ` — id="${entry.sourceId}"` : ''}
         </span>
@@ -365,29 +489,31 @@ const FillRow = memo(function FillRow({
 })
 
 /**
- * リスト行ツリー本体。FR-43のハイライト状態をpropsに含めないことで、ホバー/選択が変わっても
- * memoが効いて再レンダされない(city.svgのような数千ストロークのファイルでは、この再レンダだけで
- * 1操作あたり100〜350msかかっていた)。ホバー中の行の見た目はCSSの:hoverが、選択中の行の見た目は
- * StrokeListPanelImplが差し込む属性セレクタのルールが担当する
+ * リスト行ツリー本体。FR-43のハイライト状態や右クリックメニューの状態をpropsに含めないことで、
+ * ホバー/選択/メニュー開閉が変わってもmemoが効いて再レンダされない(city.svgのような数千ストロークの
+ * ファイルでは、この再レンダだけで1操作あたり100〜350msかかっていた)。ホバー中の行の見た目はCSSの
+ * :hoverが、選択中・メニュー対象の行の見た目はStrokeListPanelImplが差し込む属性セレクタのルールが担当する
  */
 const StrokeListRows = memo(function StrokeListRows({
   entries,
   step,
-  joinOverrides,
-  onSetJoinOverride,
   expandedKeys,
   onToggleExpanded,
   onHover,
   onSelect,
+  onContextMenu,
 }: {
   entries: ListEntry[]
   step: number
-  joinOverrides: Map<string, boolean>
-  onSetJoinOverride: (idA: string, idB: string, join: boolean) => void
   expandedKeys: ReadonlySet<string>
   onToggleExpanded: (key: string) => void
   onHover: (selection: HighlightSelection | null) => void
   onSelect: (selection: HighlightSelection) => void
+  onContextMenu: (
+    target: HighlightSelection,
+    clientX: number,
+    clientY: number,
+  ) => void
 }) {
   const groups = useMemo(() => {
     const result: ListGroup[] = []
@@ -427,54 +553,46 @@ const StrokeListRows = memo(function StrokeListRows({
         const target = findHighlightTarget(e.target)
         if (target) onSelect(target)
       }}
+      onContextMenu={(e) => {
+        const target = findHighlightTarget(e.target)
+        // 行の外(リストの余白)ではブラウザ標準のメニューをそのまま出す
+        if (!target) return
+        e.preventDefault()
+        onContextMenu(target, e.clientX, e.clientY)
+      }}
     >
-      {groups.map((group, gi) => {
-        // 畳まれた状態でもブロック境界の結合トグルは操作できるようにする(FR-14)
-        const prev = groups[gi - 1]
-        const prevTail = prev?.kind === 'block' ? prev.entries.at(-1)! : null
-        const head = group.kind === 'block' ? group.entries[0] : null
-        return (
-          <Fragment key={group.key}>
-            {prevTail && head && (
-              <JoinToggle
-                a={prevTail}
-                b={head}
-                joinOverrides={joinOverrides}
-                onSetJoinOverride={onSetJoinOverride}
-              />
+      {groups.map((group) =>
+        group.kind === 'fill' ? (
+          <FillRow
+            key={group.key}
+            entry={group.entry}
+            index={group.index}
+            pending={group.index >= step}
+            expanded={expandedKeys.has(group.key)}
+            onToggleExpanded={onToggleExpanded}
+          />
+        ) : group.entries.length === 1 ? (
+          <StrokeRow
+            key={group.key}
+            entry={group.entries[0]}
+            index={group.startIndex}
+            pending={group.startIndex >= step}
+          />
+        ) : (
+          <BlockRow
+            key={group.key}
+            groupKey={group.key}
+            entries={group.entries}
+            startIndex={group.startIndex}
+            drawnCount={Math.max(
+              0,
+              Math.min(step - group.startIndex, group.entries.length),
             )}
-            {group.kind === 'fill' ? (
-              <FillRow
-                entry={group.entry}
-                index={group.index}
-                pending={group.index >= step}
-                expanded={expandedKeys.has(group.key)}
-                onToggleExpanded={onToggleExpanded}
-              />
-            ) : group.entries.length === 1 ? (
-              <StrokeRow
-                entry={group.entries[0]}
-                index={group.startIndex}
-                pending={group.startIndex >= step}
-              />
-            ) : (
-              <BlockRow
-                groupKey={group.key}
-                entries={group.entries}
-                startIndex={group.startIndex}
-                drawnCount={Math.max(
-                  0,
-                  Math.min(step - group.startIndex, group.entries.length),
-                )}
-                expanded={expandedKeys.has(group.key)}
-                onToggleExpanded={onToggleExpanded}
-                joinOverrides={joinOverrides}
-                onSetJoinOverride={onSetJoinOverride}
-              />
-            )}
-          </Fragment>
-        )
-      })}
+            expanded={expandedKeys.has(group.key)}
+            onToggleExpanded={onToggleExpanded}
+          />
+        ),
+      )}
     </ol>
   )
 })
@@ -491,10 +609,13 @@ function StrokeListPanelImpl({
   const [isOpen, setIsOpen] = useState(true)
   const [expandedKeys, setExpandedKeys] =
     useState<ReadonlySet<string>>(EMPTY_EXPANDED)
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
 
-  // 並び替え・パス結合・塗り設定変更等でリスト構成が変わったら、既定の「畳まれた状態」に戻す
+  // 並び替え・パス結合・塗り設定変更等でリスト構成が変わったら、既定の「畳まれた状態」に戻し、
+  // 行の対応が取れなくなった右クリックメニューも閉じる
   useEffect(() => {
     setExpandedKeys((prev) => (prev.size === 0 ? prev : EMPTY_EXPANDED))
+    setContextMenu(null)
   }, [entries])
 
   const handleToggleExpanded = useCallback((key: string): void => {
@@ -505,18 +626,33 @@ function StrokeListPanelImpl({
     })
   }, [])
 
+  const handleContextMenu = useCallback(
+    (target: HighlightSelection, clientX: number, clientY: number): void => {
+      setContextMenu({ x: clientX, y: clientY, target })
+    },
+    [],
+  )
+  const handleCloseContextMenu = useCallback((): void => {
+    setContextMenu(null)
+  }, [])
+
+  // FR-43: 選択中の行のスタイル。className経由で付けるとリスト全体の再レンダが必要になるため、
+  // 対象行だけにマッチするルールを差し込む(色の定義はApp.css側の変数)。
+  // 右クリックメニューの対象行も同じ方式で枠線を付け、どの行への操作かを分かるようにする
+  const rowRules =
+    (selectedKey === null
+      ? ''
+      : `.stroke-list [data-hl-key="${selectedKey}"]{background:var(--highlight-selected-bg);box-shadow:inset 2px 0 0 var(--highlight-selected-bar)}` +
+        `.stroke-list [data-hl-key="${selectedKey}"].stroke-list-item-pending{opacity:0.75}`) +
+    (contextMenu === null
+      ? ''
+      : `.stroke-list [data-hl-key="${contextMenu.target.key}"]{outline:1px dashed var(--highlight-selected-bar);outline-offset:-1px;opacity:1}`)
+
   return (
     <section
       className={`panel panel-stroke-list${isOpen ? '' : ' panel-collapsed'}`}
     >
-      {/* FR-43: 選択中の行のスタイル。className経由で付けるとリスト全体の再レンダが必要になるため、
-          対象行だけにマッチするルールを差し込む(色の定義はApp.css側の変数) */}
-      {selectedKey !== null && (
-        <style>
-          {`.stroke-list [data-hl-key="${selectedKey}"]{background:var(--highlight-selected-bg);box-shadow:inset 2px 0 0 var(--highlight-selected-bar)}` +
-            `.stroke-list [data-hl-key="${selectedKey}"].stroke-list-item-pending{opacity:0.75}`}
-        </style>
-      )}
+      {rowRules !== '' && <style>{rowRules}</style>}
       <div className="panel-header">
         <button type="button" onClick={() => setIsOpen((v) => !v)}>
           {isOpen ? '»' : '«'}
@@ -528,13 +664,21 @@ function StrokeListPanelImpl({
           <StrokeListRows
             entries={entries}
             step={step}
-            joinOverrides={joinOverrides}
-            onSetJoinOverride={onSetJoinOverride}
             expandedKeys={expandedKeys}
             onToggleExpanded={handleToggleExpanded}
             onHover={onHover}
             onSelect={onSelect}
+            onContextMenu={handleContextMenu}
           />
+          {contextMenu !== null && (
+            <StrokeContextMenu
+              state={contextMenu}
+              entries={entries}
+              joinOverrides={joinOverrides}
+              onSetJoinOverride={onSetJoinOverride}
+              onClose={handleCloseContextMenu}
+            />
+          )}
         </div>
       )}
     </section>
