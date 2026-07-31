@@ -3,6 +3,7 @@ import type { Point } from '../types/geometry'
 import type { PreviewSegment } from '../types/svg'
 
 interface PreviewPanelProps {
+  fileName: string | null
   segments: PreviewSegment[]
   /** segmentsのうち実際に描画済み表示する本数(FR-23: ステップはListEntry単位、セグメント単位ではない) */
   visibleSegmentCount: number
@@ -151,6 +152,7 @@ function drawPenLifts(
 }
 
 function PreviewPanelImpl({
+  fileName,
   segments,
   visibleSegmentCount,
   bedWidthMm,
@@ -312,7 +314,10 @@ function PreviewPanelImpl({
   return (
     <section className="panel panel-preview">
       <div className="panel-header">
-        <h2>プレビュー</h2>
+        <div className="preview-title">
+          <h2>プレビュー</h2>
+          <span className="preview-filename">{fileName ?? 'ファイルなし'}</span>
+        </div>
         <div className="preview-step-controls">
           <button
             type="button"

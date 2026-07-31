@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { GcodeSettings } from '../types/gcode'
 import type { FillSettings } from '../types/fill'
 import type { ParseSettings } from '../types/svg'
@@ -7,7 +7,6 @@ import { GcodeSettingsPanel } from './GcodeSettingsPanel'
 import { NumberField } from './NumberField'
 
 interface SettingsPanelProps {
-  fileName: string | null
   settings: ParseSettings
   onFileSelected: (text: string, fileName: string) => void
   onSettingsChange: (settings: ParseSettings) => void
@@ -37,7 +36,6 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({
-  fileName,
   settings,
   onFileSelected,
   onSettingsChange,
@@ -63,6 +61,7 @@ export function SettingsPanel({
   const [invalidFields, setInvalidFields] = useState<Map<string, string>>(
     new Map(),
   )
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     onSettingsInvalidChange(Array.from(invalidFields.values()))
@@ -96,19 +95,48 @@ export function SettingsPanel({
       </div>
       {isOpen && (
         <div className="panel-body">
-          <div className="settings-group">
-            <label className="settings-file-label">
-              SVGファイル
-              <input
-                type="file"
-                accept=".svg,image/svg+xml"
-                onChange={handleFileChange}
-              />
-            </label>
-            {fileName && <div className="settings-filename">{fileName}</div>}
+          <div className="settings-actions">
+            <input
+              type="file"
+              accept=".svg,image/svg+xml"
+              ref={fileInputRef}
+              className="settings-file-input-hidden"
+              onChange={handleFileChange}
+            />
+            <button type="button" onClick={() => fileInputRef.current?.click()}>
+              SVG読み込み
+            </button>
+            <button
+              type="button"
+              onClick={onJoinPaths}
+              disabled={!hasEntries}
+              title="FR-14: 端点が近いストローク同士を結合ブロック化する(読込直後は未実行)"
+            >
+              {joinActivated ? 'パス結合(再実行)' : 'パス結合'}
+            </button>
+            <button type="button" onClick={onOptimize} disabled={!hasEntries}>
+              最適化
+            </button>
+            <button type="button" onClick={onResetAll}>
+              リセット
+            </button>
+            <button
+              type="button"
+              onClick={onDownloadGcode}
+              disabled={!canDownloadGcode}
+            >
+              G-codeをダウンロード
+            </button>
+            {boundsWarningCount > 0 && (
+              <p className="settings-warning-text">
+                はみ出し警告({boundsWarningCount}
+                件)が解消するまでダウンロードできません
+              </p>
+            )}
           </div>
 
           <div className="settings-group">
+            <h3>読み込み設定</h3>
             <NumberField
               label="DPI"
               value={settings.dpi}
@@ -148,6 +176,7 @@ export function SettingsPanel({
           </div>
 
           <div className="settings-group">
+            <h3>パス結合(FR-14)</h3>
             <NumberField
               label="端点結合距離(mm)"
               value={joinDistanceMm}
@@ -158,22 +187,6 @@ export function SettingsPanel({
                 handleValidity('joinDistanceMm', '端点結合距離', valid)
               }
             />
-            <div className="settings-order-controls">
-              <button
-                type="button"
-                onClick={onJoinPaths}
-                disabled={!hasEntries}
-                title="FR-14: 端点が近いストローク同士を結合ブロック化する(読込直後は未実行)"
-              >
-                {joinActivated ? 'パス結合(再実行)' : 'パス結合'}
-              </button>
-              <button type="button" onClick={onOptimize} disabled={!hasEntries}>
-                最適化
-              </button>
-              <button type="button" onClick={onResetAll}>
-                リセット
-              </button>
-            </div>
           </div>
 
           <FillSettingsPanel
@@ -186,9 +199,6 @@ export function SettingsPanel({
             settings={gcodeSettings}
             onSettingsChange={onGcodeSettingsChange}
             onInvalidFieldsChange={onGcodeInvalidChange}
-            canDownload={canDownloadGcode}
-            warningCount={boundsWarningCount}
-            onDownload={onDownloadGcode}
           />
         </div>
       )}

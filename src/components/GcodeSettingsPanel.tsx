@@ -6,18 +6,12 @@ interface GcodeSettingsPanelProps {
   settings: GcodeSettings
   onSettingsChange: (settings: GcodeSettings) => void
   onInvalidFieldsChange: (labels: string[]) => void
-  canDownload: boolean
-  warningCount: number
-  onDownload: () => void
 }
 
 export function GcodeSettingsPanel({
   settings,
   onSettingsChange,
   onInvalidFieldsChange,
-  canDownload,
-  warningCount,
-  onDownload,
 }: GcodeSettingsPanelProps) {
   const [invalidFields, setInvalidFields] = useState<Map<string, string>>(
     new Map(),
@@ -130,17 +124,6 @@ export function GcodeSettingsPanel({
             onChange={(e) => updateTemplate('end', e.target.value)}
           />
         </label>
-      </div>
-
-      <div className="settings-group">
-        <button type="button" onClick={onDownload} disabled={!canDownload}>
-          G-codeをダウンロード
-        </button>
-        {warningCount > 0 && (
-          <p className="settings-warning-text">
-            はみ出し警告({warningCount}件)が解消するまでダウンロードできません
-          </p>
-        )}
       </div>
     </>
   )

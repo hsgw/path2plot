@@ -498,7 +498,6 @@ function App() {
       <InvalidInputBanner labels={invalidFieldLabels} />
       <div className="app-layout">
         <SettingsPanel
-          fileName={fileName}
           settings={settings}
           onFileSelected={(text, name) => {
             setSvgText(text)
@@ -525,6 +524,7 @@ function App() {
           onDownloadGcode={handleDownloadGcode}
         />
         <PreviewPanel
+          fileName={fileName}
           segments={previewSegments}
           visibleSegmentCount={visibleSegmentCount}
           bedWidthMm={gcodeSettings.bedWidthMm}
