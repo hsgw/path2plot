@@ -373,7 +373,7 @@ function App() {
       .map(travelEndpoints)
     setOptimizedOrder(greedyOptimizeOrder(endpoints, { x: 0, y: 0 }))
   }, [units, strokes])
-  const handleResetOrder = useCallback((): void => {
+  const handleResetAll = useCallback((): void => {
     setOptimizedOrder(null)
     setJoinOverrides(EMPTY_JOIN_OVERRIDES)
     setJoinActivatedFor(null)
@@ -512,6 +512,11 @@ function App() {
           onGcodeInvalidChange={setGcodeInvalidLabels}
           joinDistanceMm={joinDistanceMm}
           onJoinDistanceChange={setJoinDistanceMm}
+          joinActivated={joinActivated}
+          onJoinPaths={handleJoinPaths}
+          onOptimize={handleOptimize}
+          onResetAll={handleResetAll}
+          hasEntries={listEntries.length > 0}
           fillSettings={fillSettings}
           onFillSettingsChange={setFillSettings}
           onFillInvalidChange={setFillInvalidLabels}
@@ -535,10 +540,6 @@ function App() {
           step={deferredStep}
           joinOverrides={joinOverrides}
           onSetJoinOverride={handleSetJoinOverride}
-          joinActivated={joinActivated}
-          onJoinPaths={handleJoinPaths}
-          onOptimize={handleOptimize}
-          onResetOrder={handleResetOrder}
         />
       </div>
     </div>

@@ -9,14 +9,6 @@ interface StrokeListPanelProps {
   /** FR-14: 個別上書き(結合する/しない)の現在値 */
   joinOverrides: Map<string, boolean>
   onSetJoinOverride: (idA: string, idB: string, join: boolean) => void
-  /** FR-14: パス結合(端点結合)が実行済みかどうか。読込直後はfalseで、各ストロークは未結合のまま表示される */
-  joinActivated: boolean
-  /** FR-14: パス結合(端点結合)を実行する */
-  onJoinPaths: () => void
-  /** FR-15: 貪欲法による並び替えを実行する */
-  onOptimize: () => void
-  /** 上書き・最適化結果をクリアし、出現順+未結合の状態に戻す */
-  onResetOrder: () => void
 }
 
 /**
@@ -122,10 +114,6 @@ function StrokeListPanelImpl({
   step,
   joinOverrides,
   onSetJoinOverride,
-  joinActivated,
-  onJoinPaths,
-  onOptimize,
-  onResetOrder,
 }: StrokeListPanelProps) {
   const [isOpen, setIsOpen] = useState(true)
 
@@ -138,28 +126,6 @@ function StrokeListPanelImpl({
           {isOpen ? '»' : '«'}
         </button>
         {isOpen && <h2>ストローク並び順</h2>}
-        {isOpen && (
-          <div className="stroke-list-order-controls">
-            <button
-              type="button"
-              onClick={onJoinPaths}
-              disabled={entries.length === 0}
-              title="FR-14: 端点が近いストローク同士を結合ブロック化する(読込直後は未実行)"
-            >
-              {joinActivated ? 'パス結合(再実行)' : 'パス結合'}
-            </button>
-            <button
-              type="button"
-              onClick={onOptimize}
-              disabled={entries.length === 0}
-            >
-              最適化
-            </button>
-            <button type="button" onClick={onResetOrder}>
-              順序をリセット
-            </button>
-          </div>
-        )}
       </div>
       {isOpen && (
         <div className="panel-body">

@@ -282,12 +282,12 @@
   padding-left: 6px;
 }
 
-.stroke-list-order-controls {
+.settings-order-controls {
   display: flex;
   gap: 4px;
 }
 
-.stroke-list-order-controls button {
+.settings-order-controls button {
   font-size: 11px;
 }
 

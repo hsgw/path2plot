@@ -18,6 +18,16 @@ interface SettingsPanelProps {
   /** FR-14: 端点結合距離(mm) */
   joinDistanceMm: number
   onJoinDistanceChange: (joinDistanceMm: number) => void
+  /** FR-14: パス結合(端点結合)が実行済みかどうか。読込直後はfalseで、各ストロークは未結合のまま表示される */
+  joinActivated: boolean
+  /** FR-14: パス結合(端点結合)を実行する */
+  onJoinPaths: () => void
+  /** FR-15: 貪欲法による並び替えを実行する */
+  onOptimize: () => void
+  /** 並び替え・パス結合の上書きをすべてクリアし、出現順+未結合の状態に戻す */
+  onResetAll: () => void
+  /** パス結合/最適化ボタンのdisabled判定用 */
+  hasEntries: boolean
   fillSettings: FillSettings
   onFillSettingsChange: (settings: FillSettings) => void
   onFillInvalidChange: (labels: string[]) => void
@@ -37,6 +47,11 @@ export function SettingsPanel({
   onGcodeInvalidChange,
   joinDistanceMm,
   onJoinDistanceChange,
+  joinActivated,
+  onJoinPaths,
+  onOptimize,
+  onResetAll,
+  hasEntries,
   fillSettings,
   onFillSettingsChange,
   onFillInvalidChange,
@@ -143,6 +158,22 @@ export function SettingsPanel({
                 handleValidity('joinDistanceMm', '端点結合距離', valid)
               }
             />
+            <div className="settings-order-controls">
+              <button
+                type="button"
+                onClick={onJoinPaths}
+                disabled={!hasEntries}
+                title="FR-14: 端点が近いストローク同士を結合ブロック化する(読込直後は未実行)"
+              >
+                {joinActivated ? 'パス結合(再実行)' : 'パス結合'}
+              </button>
+              <button type="button" onClick={onOptimize} disabled={!hasEntries}>
+                最適化
+              </button>
+              <button type="button" onClick={onResetAll}>
+                リセット
+              </button>
+            </div>
           </div>
 
           <FillSettingsPanel
