@@ -59,6 +59,7 @@ function buildFillBlock(
     ? connectHatchLines(
         rawLines,
         settings.spacingMm * settings.zigzagToleranceFactor,
+        offsetResult.paths,
       )
     : orderHatchLinesByNearestNeighbor(rawLines).map(({ line, reversed }) =>
         reversed ? [...line].reverse() : [...line],

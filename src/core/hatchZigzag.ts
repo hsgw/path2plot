@@ -1,5 +1,6 @@
 import type { Point } from '../types/geometry'
 import { greedyOptimizeOrder } from './pathOptimize'
+import { isSegmentInsidePolygon } from './polygonContain'
 
 function dist(a: Point, b: Point): number {
   return Math.hypot(a.x - b.x, a.y - b.y)
@@ -31,12 +32,15 @@ export function orderHatchLinesByNearestNeighbor(
 
 /**
  * FR-18: 並び替え済みのハッチ線を対象に、隣接ペアの実際の接続距離(採用した端点同士の距離)が
- * toleranceMm(=FR-19の線間隔)以下なら実線で連結し、超えれば新規チェーンを開始する
- * (穴をまたぐ場合など)。
+ * toleranceMm(=FR-19の線間隔)以下で、かつ接続線が塗り領域(boundaryPaths)からはみ出さない場合のみ
+ * 実線で連結し、それ以外は新規チェーンを開始する。
+ * 距離だけで判定すると、同一fill内に複数の島がある場合や穴をまたぐ場合に、
+ * 距離は近いが塗りの外側を通る接続線が引かれてしまう(許容距離倍率を上げるほど起こりやすい)。
  */
 function connectOrderedLines(
   ordered: OrderedLine[],
   toleranceMm: number,
+  boundaryPaths: Point[][],
 ): Point[][] {
   if (ordered.length === 0) return []
 
@@ -50,7 +54,10 @@ function connectOrderedLines(
     const oriented = orient(ordered[i])
     const tail = currentChain.at(-1)!
 
-    if (dist(tail, oriented[0]) <= toleranceMm) {
+    if (
+      dist(tail, oriented[0]) <= toleranceMm &&
+      isSegmentInsidePolygon(tail, oriented[0], boundaryPaths)
+    ) {
       currentChain.push(...oriented)
     } else {
       result.push(currentChain)
@@ -63,14 +70,17 @@ function connectOrderedLines(
 
 /**
  * FR-18: ハッチ線をジグザグ(一筆書き)に連結する。orderHatchLinesByNearestNeighborで
- * 決めた最近傍順序・向きに対し、connectOrderedLinesで許容距離判定・実際の連結を行う。
+ * 決めた最近傍順序・向きに対し、connectOrderedLinesで許容距離判定・はみ出し判定・実際の連結を行う。
+ * boundaryPathsにはハッチ線のクリップに使ったものと同じ塗り領域(FR-20のオフセット後の輪郭)を渡す。
  */
 export function connectHatchLines(
   lines: Point[][],
   toleranceMm: number,
+  boundaryPaths: Point[][],
 ): Point[][] {
   return connectOrderedLines(
     orderHatchLinesByNearestNeighbor(lines),
     toleranceMm,
+    boundaryPaths,
   )
 }
