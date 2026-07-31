@@ -587,7 +587,6 @@ function App() {
           onGcodeInvalidChange={setGcodeInvalidLabels}
           joinDistanceMm={joinDistanceMm}
           onJoinDistanceChange={setJoinDistanceMm}
-          joinActivated={joinActivated}
           onJoinPaths={handleJoinPaths}
           onOptimize={handleOptimize}
           onResetAll={handleResetAll}

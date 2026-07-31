@@ -55,6 +55,16 @@
   padding: 12px;
 }
 
+/* 設定列は上部のアクションボタン群・タブ見出しを固定し、選択中タブの中身だけをスクロールさせる。
+   左右の余白はスクロール領域の内外で別々に持たせるため、ここでは上下のみに付ける */
+.panel-body-settings {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .panel-body-canvas {
   padding: 0;
   position: relative;
@@ -125,6 +135,45 @@
 
 .settings-file-input-hidden {
   display: none;
+}
+
+/* 設定項目のタブ切り替え(SVG読み込み系 / G-code出力系) */
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.settings-tabpanel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* スクロールバーの表示有無・タブの切り替えでコンテンツ幅が変わらないよう、
+     スクロールバーの領域を常に確保する。左右のpaddingはこの領域の内側に効くため、
+     スクロールバー表示中も中身の左右には同じ幅の余白が見える */
+  padding: 0 12px;
+  scrollbar-gutter: stable;
+}
+
+.settings-tab {
+  flex: 1;
+  padding: 6px 4px;
+  font-size: 12px;
+  color: var(--text);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.settings-tab[aria-selected='true'] {
+  color: var(--text-h);
+  font-weight: 600;
+  border-bottom-color: var(--text-h);
 }
 
 .error-banner {
@@ -373,6 +422,8 @@
   flex-direction: column;
   gap: 6px;
   margin-bottom: 16px;
+  padding: 0 12px;
+  flex-shrink: 0;
 }
 
 .settings-actions button {
