@@ -206,12 +206,21 @@ function App() {
     setJoinOverrides((prev) => (prev.size === 0 ? prev : EMPTY_JOIN_OVERRIDES))
   }, [fitKey])
 
+  // optimizedOrderは非同期(useEffect)でしか破棄されないため、ファイル再読込直後の1レンダリングでは
+  // 旧ユニット数基準のインデックスと新しいunitsが同居しうる。長さが一致しない場合はここで無効化し、
+  // units[unitIdx]がundefinedになってmaterializeDrawUnitが落ちるのを防ぐ
   const unitOrder = useMemo(
-    () => optimizedOrder?.order ?? units.map((_, i) => i),
+    () =>
+      optimizedOrder?.order.length === units.length
+        ? optimizedOrder.order
+        : units.map((_, i) => i),
     [optimizedOrder, units],
   )
   const unitReversedFlags = useMemo(
-    () => optimizedOrder?.reversed ?? units.map(() => false),
+    () =>
+      optimizedOrder?.reversed.length === units.length
+        ? optimizedOrder.reversed
+        : units.map(() => false),
     [optimizedOrder, units],
   )
   const materializedUnits = useMemo(
