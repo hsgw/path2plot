@@ -31,6 +31,8 @@ import {
 import { type FillBlock, DEFAULT_FILL_SETTINGS } from './types/fill'
 import { DEFAULT_GCODE_SETTINGS } from './types/gcode'
 import type {
+  HighlightRange,
+  HighlightSelection,
   ListEntry,
   ParseSettings,
   PreviewSegment,
@@ -74,6 +76,30 @@ const DEFAULT_SETTINGS: ParseSettings = {
 const DEFAULT_JOIN_DISTANCE_MM = 0.5
 
 const PLAY_INTERVAL_MS = 400
+
+/**
+ * FR-43: リストの行(ListEntry単位)を、プレビューのセグメント範囲[start, end)に変換する。
+ * segmentCountPrefixはListEntryごとのセグメント本数の累積和。リスト再構築の直後に
+ * 古い選択が残っていても範囲外参照にならないよう、範囲外はnull(ハイライトなし)として扱う
+ */
+function toHighlightRange(
+  selection: HighlightSelection | null,
+  segmentCountPrefix: number[],
+): HighlightRange | null {
+  if (selection === null) return null
+  const endEntry = selection.entryIndex + selection.entryCount
+  if (selection.entryIndex < 0 || endEntry >= segmentCountPrefix.length) {
+    return null
+  }
+  const base = segmentCountPrefix[selection.entryIndex]
+  if (selection.segmentOffset === undefined) {
+    return { start: base, end: segmentCountPrefix[endEntry] }
+  }
+  // 塗りブロック内の1本(輪郭線・ハッチ線)を指す場合
+  const start = base + selection.segmentOffset
+  if (start >= segmentCountPrefix[endEntry]) return null
+  return { start, end: start + 1 }
+}
 
 function App() {
   const [svgText, setSvgText] = useState<string | null>(null)
@@ -469,6 +495,35 @@ function App() {
   const visibleSegmentCount =
     segmentCountPrefix[Math.min(step, segmentCountPrefix.length - 1)] ?? 0
 
+  // FR-43: ストローク並び順リストのホバー/選択と、プレビューのハイライト表示を同期する。
+  // リスト構成が変わった時点で対応が取れなくなるため、両方とも解除する
+  const [hoveredSelection, setHoveredSelection] =
+    useState<HighlightSelection | null>(null)
+  const [selectedSelection, setSelectedSelection] =
+    useState<HighlightSelection | null>(null)
+  useEffect(() => {
+    setHoveredSelection(null)
+    setSelectedSelection(null)
+  }, [listEntries])
+  // ホバーはmousemove相当の頻度で通知されるため、同じ行のままなら前の状態をそのまま返して
+  // 再レンダ自体を起こさない。選択は同じ行の再クリックで解除する
+  const handleHover = useCallback((next: HighlightSelection | null): void => {
+    setHoveredSelection((prev) =>
+      (prev?.key ?? null) === (next?.key ?? null) ? prev : next,
+    )
+  }, [])
+  const handleSelect = useCallback((next: HighlightSelection): void => {
+    setSelectedSelection((prev) => (prev?.key === next.key ? null : next))
+  }, [])
+  const hoverHighlight = useMemo(
+    () => toHighlightRange(hoveredSelection, segmentCountPrefix),
+    [hoveredSelection, segmentCountPrefix],
+  )
+  const selectedHighlight = useMemo(
+    () => toHighlightRange(selectedSelection, segmentCountPrefix),
+    [selectedSelection, segmentCountPrefix],
+  )
+
   const fillErrors = useMemo(
     () => fillBlocks.flatMap((fb) => (fb.error ? [fb.error] : [])),
     [fillBlocks],
@@ -527,6 +582,8 @@ function App() {
           fileName={fileName}
           segments={previewSegments}
           visibleSegmentCount={visibleSegmentCount}
+          hoverHighlight={hoverHighlight}
+          selectedHighlight={selectedHighlight}
           bedWidthMm={gcodeSettings.bedWidthMm}
           bedHeightMm={gcodeSettings.bedHeightMm}
           step={step}
@@ -540,6 +597,9 @@ function App() {
           step={deferredStep}
           joinOverrides={joinOverrides}
           onSetJoinOverride={handleSetJoinOverride}
+          selectedKey={selectedSelection?.key ?? null}
+          onHover={handleHover}
+          onSelect={handleSelect}
         />
       </div>
     </div>

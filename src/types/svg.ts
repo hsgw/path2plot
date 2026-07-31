@@ -65,6 +65,25 @@ export interface FillListEntry {
 export type ListEntry = StrokeListEntry | FillListEntry
 
 /**
+ * FR-43: ストローク並び順リスト上で選択/ホバーされた行を指す。listEntries上の連続範囲で表し、
+ * 塗りブロックを展開して個別の輪郭線・ハッチ線を指す場合のみsegmentOffset(そのブロック内での
+ * 物理セグメント番号)を持つ。keyは行を一意に識別する文字列で、選択/ホバー状態の比較にのみ使う
+ */
+export interface HighlightSelection {
+  key: string
+  entryIndex: number
+  /** 対象とするListEntryの数(結合ブロック行なら本数、それ以外は1) */
+  entryCount: number
+  segmentOffset?: number
+}
+
+/** HighlightSelectionをプレビューのセグメント番号に変換した範囲 [start, end) */
+export interface HighlightRange {
+  start: number
+  end: number
+}
+
+/**
  * プレビュー描画用の物理セグメント(1要素=1回の実際のペン上げ下げ)。G-code出力の
  * DrawGroup granularityと一致する(結合ブロックは常に1セグメント、塗りブロックは
  * 輪郭線+ハッチ本数分のセグメントを持つ)。penLiftBeforeは直前のセグメントとの間に
