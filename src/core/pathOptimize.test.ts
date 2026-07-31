@@ -117,6 +117,39 @@ describe('buildJoinedBlocks', () => {
     const indices = blocks[0].members.map((m) => m.strokeIndex).sort()
     expect(indices).toEqual([0, 1, 2, 3])
   })
+
+  it('多数のストロークが広範囲(多数のグリッドセル)に渡っても正しく1本のチェーンに結合される', () => {
+    const n = 2000
+    const strokes: ParsedStroke[] = []
+    for (let i = 0; i < n; i++) {
+      const x0 = i * 10
+      strokes.push(
+        stroke(`s${i}`, [
+          [x0, 0],
+          [x0 + 9.7, 0],
+        ]),
+      )
+    }
+    const blocks = buildJoinedBlocks(strokes, 0.5, new Map())
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0].members).toHaveLength(n)
+  })
+
+  it('広範囲に散らばった大量のストロークは閾値超のため誤結合されない', () => {
+    const n = 500
+    const strokes: ParsedStroke[] = []
+    for (let i = 0; i < n; i++) {
+      const x0 = i * 100
+      strokes.push(
+        stroke(`s${i}`, [
+          [x0, 0],
+          [x0 + 5, 0],
+        ]),
+      )
+    }
+    const blocks = buildJoinedBlocks(strokes, 0.5, new Map())
+    expect(blocks).toHaveLength(n)
+  })
 })
 
 describe('materializeBlock', () => {

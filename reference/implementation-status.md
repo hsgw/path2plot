@@ -116,6 +116,13 @@
 - **既定DPI値の変更(2026-07-13)**: `App.tsx`の`DEFAULT_SETTINGS.dpi`を96→**72**に変更した。実運用で読み込むSVGはIllustrator書き出しが主であり、Illustratorの標準的な座標系(1 user unit = 1pt = 1/72インチ)に合わせることで、読み込み直後からDPI設定を手動で変更しなくても正しい実寸で表示・G-code出力できるようにするため(参考: `fixtures/user/gcode_test.svg`の実測でDPI=72相当と判明)
 - rect要素の角丸(rx/ry)は仕様(SPEC.md)に明記がないため未対応(直角のみ)
 - **UIリファクタリング(2026-07-13)**: エラー表示を`SettingsPanel`内のインライン表示から、画面上部に常時表示される`ErrorBanner`(新規`src/components/ErrorBanner.tsx`)に変更。設定列の開閉状態に関わらず視認できる(FR-41の警告表示パターンをFR-36のパース/要素エラーにも拡張)。手動で閉じられるが、エラー内容(signature)が変わると自動的に再表示される。FR-43のクリック/ホバー相互ハイライトやエラー文言の日本語整形は今回は対象外(見送り、要望があれば別途対応)
+- **パフォーマンス改善(2026-07-31)**: `fixtures/user/city.svg`(5,831パス、863KB)のような大規模SVGで、読込〜プレビュー表示可能になるまでの時間が長くUIがブロックされる問題があった。原因はSVGパース(`parseSvgFile`)・塗りブロック生成(`buildFillBlocks`)・端点結合(`buildJoinedBlocks`、FR-14)がいずれもReactの`useMemo`内で同期実行されており、特に`buildJoinedBlocks`が全ストロークペア総当たりのO(n²)だったこと(詳細はPhase4のメモ参照、アルゴリズム自体は今回O(n)近傍探索に変更済み)。対策として`buildFillBlocks`・`buildJoinedBlocks`の2処理を新規`src/core/processing.worker.ts`(Viteネイティブの`new Worker(new URL(...), {type:'module'})`、追加ライブラリなし)にオフロードし、`App.tsx`は`postMessage`で依頼・`requestId`突き合わせで古い結果を無視する方式に変更した。処理中は新規`src/components/ProcessingOverlay.tsx`でフェーズラベル(塗り生成中/パス結合中)とパーセンテージのプログレスバーを表示する。`parseSvgFile`はWorkerに含めなかった: 実装当初は3処理すべてをWorker化する想定だったが、Playwrightでの実機検証(Chromium)で`DOMParser is not defined`が発生し、DedicatedWorkerGlobalScopeでは`DOMParser`が実際には利用できないことが判明した(TypeScriptの`lib.webworker.d.ts`にも`DOMParser`型は存在せず、`lib.dom.d.ts`限定)ため、SVGパース自体は従来通りメインスレッドの同期`useMemo`に残した。city.svgでの実機確認では、パース〜プレビュー表示完了までの体感時間が約1.3秒に収まり、進捗バーも意図通り表示・消滅することを確認した
+  - 進捗バーはUI改善要望を受け、画面上部の帯状バナーから画面中央のポップアップ(半透明の背景+カード)に変更した(`ProcessingOverlay.tsx`、`.processing-overlay-backdrop`)
+- **ステップ実行プレビュー(前へ/次へ/再生)のフリーズ解消(2026-07-31)**: 上記のWorkerオフロード後も、city.svg規模でステップボタン押下時に数百ms〜1秒近く描画が固まる問題が残っていた。調査の結果、ステップ変更ではパイプライン(Worker)は一切再実行されておらず、原因は**レンダリング側**にあると判明:
+  1. `PreviewPanel.tsx`のCanvas描画が、step非依存の静的な「ゴースト表示(全ストロークの薄い背景描画)」を含めて毎ステップ全セグメントを描き直していた。加えて`ResizeObserver`を`draw()`呼び出しのたびに再生成しており、`observe()`の初回コールバックにより1操作でdrawが2回走っていた
+  2. `StrokeListPanel.tsx`が`i >= step`の判定を全行に持ち、1クリックで最大1万数千個のReact要素を再生成・再照合していた(`React.memo`等はコードベース全体で未使用だった)
+  - 対策: `PreviewPanel`を「ベースレイヤー(ベッド白塗り+ゴースト、stepに依存せず再描画しない)」と「アクティブレイヤー(ペンアップ破線+実色描画+開始点◯+方向矢印、stepで更新)」の2枚のCanvas([position: absolute](../src/App.css)で重ね合わせ)に分離し、アクティブレイヤーは「次へ」「再生」時(可視セグメント数が単調増加、かつsegments/表示サイズが不変)は新規区間のみを追記描画するようにした。「前へ」やファイル再読込・リサイズ時は従来通りフル再描画する。`toScreen`が毎点ごとに`Point`オブジェクトを新規確保していた箇所も、画面座標を直接返す`toX`/`toY`関数呼び出しに置き換えGCコストを削減した。`StrokeListPanel`は行コンポーネント(`StrokeRow`/`FillRow`/`JoinToggle`)を`React.memo`化し、`App.tsx`側でstepをそのまま渡さず`useDeferredValue`経由(低優先度・中断可能な更新)で渡すことで、巨大リストの再構築がCanvas更新をブロックしないようにした。`visibleSegmentCount`もO(N)の`slice`+`reduce`から累積和配列によるO(1)参照に変更。ついでに、ファイル読込のたび`joinOverrides`の`useEffect`リセットが新しい`Map`参照を作り、Workerへの`postMessage`が2回走っていた不具合も、空Mapの参照を使い回す方式に修正した
+  - Playwrightでcity.svgを用いて実測(ヘッドレスChromium、クリックから2フレーム後のペイントまでの時間を計測): 「次へ」(追記描画)は修正前平均466ms→修正後平均66ms、「前へ」(フル再描画)は平均472ms→平均137ms(いずれも改善前後で同一手法により計測、詳細ログはコミットに含めず)。`fixtures/phase2/many-strokes.svg`・`fixtures/phase4/near-touching-endpoints.svg`で、開始点◯・方向矢印・ペンアップ赤破線・ゴースト表示・結合ブロックの視覚的な表現が変更前と同一であることをスクリーンショットで確認した
 
 ---
 
@@ -358,6 +365,12 @@ M2                                 ; プログラム終了
 - ユーザーがPhase3で確定した基本G-code(直線分割のみ)をPrusa MK3S実機で確認した結果、「G2/G3出力の必要性を感じなくなった」との判断があり、FR-33(真円判定・G2/G3出力)は実装せずSPEC.mdから削除した。FR-33はもともと未実装のままだったため、ソースコードの変更は発生していない
 - SPEC.mdの変更内容: 機能要件からFR-33を削除、「やらないこと」セクションの記述を一般化(ベジェに加えSVG円弧コマンド・circle/ellipse要素のG2/G3出力も対象外と明記)、FR-38から円弧の実ジオメトリ判定の一文を削除(直線分割+サギッタ安全マージンの記述のみ残存。すべての円/楕円が直線分割される前提になったため矛盾なくカバーされる)、技術構成のARC_SUPPORT前提の一文を削除、未決事項からOQ-10を削除。version 1.0→1.1に更新し変更履歴に記録した
 - `fixtures/phase4/circles-and-ellipses.svg`は今後別の用途(円/楕円の直線分割自体の確認等)で再利用できる可能性があるため削除せず残した
+
+**メモ(パフォーマンス改善、2026-07-31)**
+
+- `fixtures/user/city.svg`(5,831パスの実データ)読込時の処理時間が長すぎる問題を受け、`buildJoinedBlocks`の候補列挙を全ストロークペア総当たり(O(n²))から、セルサイズ=`joinDistanceMm`の空間ハッシュグリッドによる近傍探索(自セル+周囲8セルのみ走査)に変更した。距離<=`joinDistanceMm`のペアはこの3x3近傍探索で漏れなく捕捉できる(セルサイズ>=探索半径の空間ハッシュの標準的な性質)。overridesで強制結合(true)されたペアは距離に関わらず必要なため、グリッド探索とは別に個別処理する。挙動(結合順序・overrideの強制結合/強制非結合の扱い)は変更していない
+- `greedyOptimizeOrder`(FR-15)は「最適化」ボタン押下時のみの処理であり今回のスコープ外としたため、O(n²)のまま
+- 詳細はPhase1のメモ(Web Worker化・進捗バー追加)を参照
 
 ---
 

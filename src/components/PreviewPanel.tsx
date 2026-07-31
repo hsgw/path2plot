@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import type { Point } from '../types/geometry'
 import type { PreviewSegment } from '../types/svg'
 
@@ -17,10 +17,52 @@ interface PreviewPanelProps {
   onTogglePlaying: () => void
 }
 
+interface View {
+  dpr: number
+  width: number
+  height: number
+  boundsWidth: number
+  boundsHeight: number
+  scale: number
+  offsetX: number
+  offsetY: number
+}
+
 const START_MARKER_RADIUS_PX = 4
 const ARROW_SIZE_PX = 5
 const GHOST_ALPHA = 0.2
 const BED_FILL_COLOR = '#ffffff'
+const PADDING_PX = 20
+
+function computeView(
+  width: number,
+  height: number,
+  bedWidthMm: number,
+  bedHeightMm: number,
+): View {
+  const dpr = window.devicePixelRatio || 1
+  const boundsWidth = Math.max(bedWidthMm, 1e-6)
+  const boundsHeight = Math.max(bedHeightMm, 1e-6)
+  const scale =
+    width > 0 && height > 0
+      ? Math.min(
+          (width - PADDING_PX * 2) / boundsWidth,
+          (height - PADDING_PX * 2) / boundsHeight,
+        )
+      : 0
+  const offsetX = (width - boundsWidth * scale) / 2
+  const offsetY = (height - boundsHeight * scale) / 2
+  return {
+    dpr,
+    width,
+    height,
+    boundsWidth,
+    boundsHeight,
+    scale,
+    offsetX,
+    offsetY,
+  }
+}
 
 /** FR-24: 開始点の◯表示 */
 function drawStartMarker(ctx: CanvasRenderingContext2D, at: Point): void {
@@ -58,25 +100,57 @@ function drawDirectionArrow(
   ctx.fill()
 }
 
-/** 1本のセグメントを実線で描画し、開始点の画面座標を返す */
-function strokeOutline(
+/**
+ * 1本のセグメントを実線で描画し、開始点の画面座標を返す。
+ * toX/toYは画面座標を直接返す関数として渡し、Point配列の中間確保(.map)を避ける
+ */
+function drawSegmentStroke(
   ctx: CanvasRenderingContext2D,
   segment: PreviewSegment,
-  toScreen: (p: Point) => Point,
+  toX: (p: Point) => number,
+  toY: (p: Point) => number,
   defaultColor: string,
 ): Point | null {
   if (segment.points.length < 2) return null
   ctx.strokeStyle = segment.color || defaultColor
   ctx.lineWidth = 1.5
   ctx.beginPath()
-  const [first, ...rest] = segment.points.map(toScreen)
-  ctx.moveTo(first.x, first.y)
-  for (const p of rest) ctx.lineTo(p.x, p.y)
+  const p0 = segment.points[0]
+  ctx.moveTo(toX(p0), toY(p0))
+  for (let i = 1; i < segment.points.length; i++) {
+    const p = segment.points[i]
+    ctx.lineTo(toX(p), toY(p))
+  }
   ctx.stroke()
-  return first
+  return { x: toX(p0), y: toY(p0) }
 }
 
-export function PreviewPanel({
+/** FR-25: ペンアップ移動経路(赤の破線)を[from, to)の範囲だけ描く */
+function drawPenLifts(
+  ctx: CanvasRenderingContext2D,
+  segments: PreviewSegment[],
+  from: number,
+  to: number,
+  toX: (p: Point) => number,
+  toY: (p: Point) => number,
+): void {
+  ctx.save()
+  ctx.strokeStyle = '#e04949'
+  ctx.lineWidth = 1
+  ctx.setLineDash([4, 3])
+  for (let i = from; i < to - 1; i++) {
+    if (!segments[i + 1].penLiftBefore) continue
+    const start = segments[i].points.at(-1)!
+    const end = segments[i + 1].points[0]
+    ctx.beginPath()
+    ctx.moveTo(toX(start), toY(start))
+    ctx.lineTo(toX(end), toY(end))
+    ctx.stroke()
+  }
+  ctx.restore()
+}
+
+function PreviewPanelImpl({
   segments,
   visibleSegmentCount,
   bedWidthMm,
@@ -87,95 +161,153 @@ export function PreviewPanel({
   onStep,
   onTogglePlaying,
 }: PreviewPanelProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const canvasBaseRef = useRef<HTMLCanvasElement>(null)
+  const canvasActiveRef = useRef<HTMLCanvasElement>(null)
+  const [viewSize, setViewSize] = useState({ width: 0, height: 0 })
 
+  // ベース(ゴースト)レイヤーの描画済み色・アクティブレイヤーの差分描画状態を、
+  // ステップ操作のたびに再生成せずレイヤー間で共有するためのref
+  const defaultColorRef = useRef('#000')
+  const renderedCountRef = useRef(0)
+  const lastSegmentsRef = useRef<PreviewSegment[] | null>(null)
+  const lastViewRef = useRef<View | null>(null)
+
+  const view = useMemo(
+    () => computeView(viewSize.width, viewSize.height, bedWidthMm, bedHeightMm),
+    [viewSize, bedWidthMm, bedHeightMm],
+  )
+
+  // コンテナのリサイズ監視。実際にサイズが変化した場合のみstateを更新し(rAFでコアレス)、
+  // ResizeObserverの生成自体はマウント時の1回のみに抑える
   useEffect(() => {
-    const canvas = canvasRef.current
-    const container = canvas?.parentElement
-    if (!canvas || !container) return
+    const container = containerRef.current
+    if (!container) return
 
-    const draw = (): void => {
-      const dpr = window.devicePixelRatio || 1
+    const measure = (): void => {
       const width = container.clientWidth
       const height = container.clientHeight
-      canvas.width = width * dpr
-      canvas.height = height * dpr
-
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      ctx.clearRect(0, 0, width, height)
-
-      // プレビューは想定描画可能領域(FR-35)の大きさを基準に固定表示する(DPI/倍率設定を変えても
-      // ビュー自体は拡大縮小されず、はみ出し具合がそのまま見た目に反映される)
-      const boundsWidth = Math.max(bedWidthMm, 1e-6)
-      const boundsHeight = Math.max(bedHeightMm, 1e-6)
-      const padding = 20
-      const scale = Math.min(
-        (width - padding * 2) / boundsWidth,
-        (height - padding * 2) / boundsHeight,
+      setViewSize((prev) =>
+        prev.width === width && prev.height === height
+          ? prev
+          : { width, height },
       )
-      const offsetX = (width - boundsWidth * scale) / 2
-      const offsetY = (height - boundsHeight * scale) / 2
+    }
 
-      const toScreen = (p: Point): Point => ({
-        x: offsetX + p.x * scale,
-        y: height - (offsetY + p.y * scale),
+    measure()
+    let rafId = 0
+    const observer = new ResizeObserver(() => {
+      if (rafId) return
+      rafId = requestAnimationFrame(() => {
+        rafId = 0
+        measure()
       })
+    })
+    observer.observe(container)
+    return () => {
+      observer.disconnect()
+      if (rafId) cancelAnimationFrame(rafId)
+    }
+  }, [])
 
-      // 想定ベッドサイズの枠のみを白で塗り、外側はアプリ背景色のまま(CSS側で未設定にして透過させている)
-      ctx.fillStyle = BED_FILL_COLOR
-      ctx.fillRect(offsetX, offsetY, boundsWidth * scale, boundsHeight * scale)
+  // ベースレイヤー: ベッド白塗り+全セグメントのゴースト表示(FR-23のstepには依存しない静的レイヤー)
+  useEffect(() => {
+    const canvas = canvasBaseRef.current
+    if (!canvas || view.width === 0 || view.height === 0) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
 
-      const drawnSegments = segments.slice(0, visibleSegmentCount)
-      const defaultColor = getComputedStyle(canvas).color || '#000'
+    canvas.width = view.width * view.dpr
+    canvas.height = view.height * view.dpr
+    ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0)
+    ctx.clearRect(0, 0, view.width, view.height)
 
-      // ゴースト表示: ステップを戻しても全体像を失わないよう、全セグメントを薄く常時描画する
-      ctx.save()
-      ctx.globalAlpha = GHOST_ALPHA
-      ctx.lineJoin = 'round'
-      ctx.lineCap = 'round'
-      for (const segment of segments) {
-        strokeOutline(ctx, segment, toScreen, defaultColor)
-      }
-      ctx.restore()
+    ctx.fillStyle = BED_FILL_COLOR
+    ctx.fillRect(
+      view.offsetX,
+      view.offsetY,
+      view.boundsWidth * view.scale,
+      view.boundsHeight * view.scale,
+    )
 
-      // FR-25: ペンアップ移動経路。penLiftBefore=falseの区間(FR-14の結合ブロック内部)は
-      // 実際にペンを上げないため移動経路を描かない
-      ctx.save()
-      ctx.strokeStyle = '#e04949'
-      ctx.lineWidth = 1
-      ctx.setLineDash([4, 3])
-      for (let i = 0; i < drawnSegments.length - 1; i++) {
-        if (!drawnSegments[i + 1].penLiftBefore) continue
-        const from = toScreen(drawnSegments[i].points.at(-1)!)
-        const to = toScreen(drawnSegments[i + 1].points[0])
-        ctx.beginPath()
-        ctx.moveTo(from.x, from.y)
-        ctx.lineTo(to.x, to.y)
-        ctx.stroke()
-      }
-      ctx.restore()
+    const defaultColor = getComputedStyle(canvas).color || '#000'
+    defaultColorRef.current = defaultColor
+
+    const toX = (p: Point): number => view.offsetX + p.x * view.scale
+    const toY = (p: Point): number =>
+      view.height - (view.offsetY + p.y * view.scale)
+
+    ctx.save()
+    ctx.globalAlpha = GHOST_ALPHA
+    ctx.lineJoin = 'round'
+    ctx.lineCap = 'round'
+    for (const segment of segments) {
+      drawSegmentStroke(ctx, segment, toX, toY, defaultColor)
+    }
+    ctx.restore()
+  }, [segments, view])
+
+  // アクティブレイヤー: ペンアップ移動経路+実色描画+開始点◯+方向矢印。
+  // 直前の描画からsegments/viewが変わらず、可視本数が増えただけの場合(次へ/再生)は
+  // 新規区間だけを追記描画し、それ以外(戻す/ファイル再読込/リサイズ)は全体を描き直す
+  useEffect(() => {
+    const canvas = canvasActiveRef.current
+    if (!canvas || view.width === 0 || view.height === 0) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const canAppend =
+      lastSegmentsRef.current === segments &&
+      lastViewRef.current === view &&
+      visibleSegmentCount >= renderedCountRef.current
+
+    if (!canAppend) {
+      canvas.width = view.width * view.dpr
+      canvas.height = view.height * view.dpr
+      ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0)
+      ctx.clearRect(0, 0, view.width, view.height)
+      renderedCountRef.current = 0
+    }
+
+    const start = renderedCountRef.current
+    if (start < visibleSegmentCount) {
+      const toX = (p: Point): number => view.offsetX + p.x * view.scale
+      const toY = (p: Point): number =>
+        view.height - (view.offsetY + p.y * view.scale)
+      const defaultColor = defaultColorRef.current
+
+      // FR-25: penLiftBefore=falseの区間(FR-14の結合ブロック内部)は移動経路を描かない
+      drawPenLifts(
+        ctx,
+        segments,
+        Math.max(0, start - 1),
+        visibleSegmentCount,
+        toX,
+        toY,
+      )
 
       // FR-26: 実際の色で描画
       ctx.lineJoin = 'round'
       ctx.lineCap = 'round'
-      for (const segment of drawnSegments) {
-        const first = strokeOutline(ctx, segment, toScreen, defaultColor)
+      for (let i = start; i < visibleSegmentCount; i++) {
+        const segment = segments[i]
+        const first = drawSegmentStroke(ctx, segment, toX, toY, defaultColor)
         if (!first) continue
 
         // FR-24: 開始点◯・描画方向の表示
         ctx.fillStyle = segment.color || defaultColor
         drawStartMarker(ctx, first)
-        drawDirectionArrow(ctx, first, toScreen(segment.points[1]))
+        drawDirectionArrow(ctx, first, {
+          x: toX(segment.points[1]),
+          y: toY(segment.points[1]),
+        })
       }
     }
 
-    draw()
-    const observer = new ResizeObserver(draw)
-    observer.observe(container)
-    return () => observer.disconnect()
-  }, [segments, visibleSegmentCount, bedWidthMm, bedHeightMm])
+    renderedCountRef.current = visibleSegmentCount
+    lastSegmentsRef.current = segments
+    lastViewRef.current = view
+  }, [segments, visibleSegmentCount, view])
 
   return (
     <section className="panel panel-preview">
@@ -208,9 +340,12 @@ export function PreviewPanel({
           </span>
         </div>
       </div>
-      <div className="panel-body panel-body-canvas">
-        <canvas ref={canvasRef} className="preview-canvas" />
+      <div className="panel-body panel-body-canvas" ref={containerRef}>
+        <canvas ref={canvasBaseRef} className="preview-canvas" />
+        <canvas ref={canvasActiveRef} className="preview-canvas" />
       </div>
     </section>
   )
 }
+
+export const PreviewPanel = memo(PreviewPanelImpl)

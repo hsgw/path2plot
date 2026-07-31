@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import './App.css'
 import { SettingsPanel } from './components/SettingsPanel'
 import { PreviewPanel } from './components/PreviewPanel'
@@ -7,23 +14,45 @@ import { ErrorBanner } from './components/ErrorBanner'
 import { BoundsWarningBanner } from './components/BoundsWarningBanner'
 import { FillErrorBanner } from './components/FillErrorBanner'
 import { InvalidInputBanner } from './components/InvalidInputBanner'
-import { parseSvgFile } from './core/svgParser'
+import { ProcessingOverlay } from './components/ProcessingOverlay'
 import { checkStrokeBounds } from './core/boundsCheck'
-import { buildFillBlocks } from './core/fillBlock'
 import { generateGcode } from './core/gcodeGenerate'
+import { parseSvgFile } from './core/svgParser'
 import {
   type DrawUnit,
   materializeDrawUnit,
   travelEndpoints,
 } from './core/drawUnit'
-import {
-  buildJoinedBlocks,
-  greedyOptimizeOrder,
-  joinOverrideKey,
-} from './core/pathOptimize'
-import { DEFAULT_FILL_SETTINGS } from './types/fill'
+import { greedyOptimizeOrder, joinOverrideKey } from './core/pathOptimize'
+import { type FillBlock, DEFAULT_FILL_SETTINGS } from './types/fill'
 import { DEFAULT_GCODE_SETTINGS } from './types/gcode'
-import type { ListEntry, ParseSettings, PreviewSegment } from './types/svg'
+import type {
+  ListEntry,
+  ParseSettings,
+  PreviewSegment,
+  SvgParseResult,
+} from './types/svg'
+import type { JoinedBlock } from './core/pathOptimize'
+import type {
+  ProcessingPhase,
+  ProcessingRequest,
+  ProcessingResponse,
+} from './types/processing'
+
+interface ProcessedResult {
+  /** この結果がどのparseResultに対して計算されたものかを示す参照。現在のparseResultと
+   * 一致する場合のみ有効な結果として扱う(ファイル切替直後、新しいstrokesに古いblocks/
+   * fillBlocksが紐付いてしまう不整合を防ぐ) */
+  parseResult: SvgParseResult
+  fillBlocks: FillBlock[]
+  blocks: JoinedBlock[]
+}
+
+const EMPTY_FILL_BLOCKS: FillBlock[] = []
+const EMPTY_BLOCKS: JoinedBlock[] = []
+// 空Mapの参照を使い回すことで、リセット時にsetJoinOverridesが不要な再postMessageを
+// 引き起こさないようにする(ファイル読込ごとにWorkerが2回起動する不具合の解消)
+const EMPTY_JOIN_OVERRIDES: Map<string, boolean> = new Map()
 
 const DEFAULT_SETTINGS: ParseSettings = {
   // Illustrator書き出しSVGの標準的な座標系(1 user unit = 1pt = 1/72インチ)に合わせた既定値
@@ -59,6 +88,8 @@ function App() {
     [settingsInvalidLabels, gcodeInvalidLabels, fillInvalidLabels],
   )
 
+  // SVGパースはDOMParserに依存し、Workerのグローバルスコープでは利用できない(実機検証で確認済み)
+  // ため、メインスレッドの同期処理のままとする
   const parseResult = useMemo(() => {
     if (svgText === null) return null
     return parseSvgFile(svgText, settings)
@@ -71,20 +102,86 @@ function App() {
   // FR-17〜21: 塗りつぶし(ハッチング)設定。ペン(レイヤー)概念導入(Phase7)前は、
   // 全ての塗りブロックに共通の設定として全体で共有する(joinDistanceMmと同じ簡略化パターン)
   const [fillSettings, setFillSettings] = useState(DEFAULT_FILL_SETTINGS)
-  const fillBlocks = useMemo(
-    () => buildFillBlocks(fillCandidates, fillSettings),
-    [fillCandidates, fillSettings],
-  )
 
   // FR-14: 端点結合(結合ブロック化)。距離閾値+個別上書きから毎回再計算する
   const [joinDistanceMm, setJoinDistanceMm] = useState(DEFAULT_JOIN_DISTANCE_MM)
-  const [joinOverrides, setJoinOverrides] = useState<Map<string, boolean>>(
-    new Map(),
-  )
-  const blocks = useMemo(
-    () => buildJoinedBlocks(strokes, joinDistanceMm, joinOverrides),
-    [strokes, joinDistanceMm, joinOverrides],
-  )
+  const [joinOverrides, setJoinOverrides] =
+    useState<Map<string, boolean>>(EMPTY_JOIN_OVERRIDES)
+
+  // 塗りブロック生成(buildFillBlocks)→端点結合(buildJoinedBlocks、FR-14)はいずれも重い処理のため、
+  // メインスレッドをブロックしないようWeb Workerにオフロードする。結果は「どのparseResultに対する
+  // 計算か」とセットで保持し、現在のparseResultと一致する場合のみ有効な結果として扱う。
+  // isProcessingもこの一致比較から導出する(setStateで別管理すると、ファイル読込直後の1コミット内で
+  // 他のeffectがまだ更新前の値を読んでしまうタイミング問題が起きるため、派生値にして回避する)
+  const [processed, setProcessed] = useState<ProcessedResult | null>(null)
+  const isProcessing =
+    parseResult !== null && processed?.parseResult !== parseResult
+  const fillBlocks =
+    processed?.parseResult === parseResult
+      ? processed.fillBlocks
+      : EMPTY_FILL_BLOCKS
+  const blocks =
+    processed?.parseResult === parseResult ? processed.blocks : EMPTY_BLOCKS
+
+  const [processingPhase, setProcessingPhase] =
+    useState<ProcessingPhase | null>(null)
+  const [processingPercent, setProcessingPercent] = useState(0)
+
+  // 設定変更のたびpostMessageし、返信のrequestIdが最新のリクエストと一致しない場合
+  // (設定を素早く連続変更した場合)は古い結果として無視する
+  const workerRef = useRef<Worker | null>(null)
+  const requestIdRef = useRef(0)
+  const pendingRequestParseResultRef = useRef<SvgParseResult | null>(null)
+
+  useEffect(() => {
+    const worker = new Worker(
+      new URL('./core/processing.worker.ts', import.meta.url),
+      { type: 'module' },
+    )
+    workerRef.current = worker
+    worker.onmessage = (event: MessageEvent<ProcessingResponse>) => {
+      const message = event.data
+      if (message.requestId !== requestIdRef.current) return
+      if (message.type === 'progress') {
+        setProcessingPhase(message.phase)
+        setProcessingPercent(message.percent)
+        return
+      }
+      const forParseResult = pendingRequestParseResultRef.current
+      if (forParseResult === null) return
+      setProcessed({
+        parseResult: forParseResult,
+        fillBlocks: message.fillBlocks,
+        blocks: message.blocks,
+      })
+      setProcessingPhase(null)
+    }
+    return () => worker.terminate()
+  }, [])
+
+  useEffect(() => {
+    if (parseResult === null) {
+      setProcessed(null)
+      return
+    }
+    const worker = workerRef.current
+    if (!worker) return
+    const requestId = ++requestIdRef.current
+    pendingRequestParseResultRef.current = parseResult
+    setProcessingPhase('fill')
+    setProcessingPercent(0)
+    const request: ProcessingRequest = {
+      requestId,
+      strokes,
+      fillCandidates,
+      fillSettings,
+      joinDistanceMm,
+      joinOverrides,
+    }
+    worker.postMessage(request)
+    // strokes/fillCandidatesはparseResultからのみ導出される派生値(parseResultがnullでない限り
+    // 参照も安定)のため、依存配列はparseResultの変化のみで十分
+  }, [parseResult, fillSettings, joinDistanceMm, joinOverrides])
 
   // FR-14の結合ブロックとFR-22の塗りブロックを、書き順並び替え(FR-15)の対象として1列に統合する
   const units: DrawUnit[] = useMemo(
@@ -106,7 +203,7 @@ function App() {
     setOptimizedOrder(null)
   }, [units])
   useEffect(() => {
-    setJoinOverrides(new Map())
+    setJoinOverrides((prev) => (prev.size === 0 ? prev : EMPTY_JOIN_OVERRIDES))
   }, [fitKey])
 
   const unitOrder = useMemo(
@@ -186,27 +283,26 @@ function App() {
     [materializedUnits],
   )
 
-  const handleOptimize = (): void => {
+  const handleOptimize = useCallback((): void => {
     const endpoints = units
       .map((u) => materializeDrawUnit(u, strokes, false))
       .map(travelEndpoints)
     setOptimizedOrder(greedyOptimizeOrder(endpoints, { x: 0, y: 0 }))
-  }
-  const handleResetOrder = (): void => {
+  }, [units, strokes])
+  const handleResetOrder = useCallback((): void => {
     setOptimizedOrder(null)
-    setJoinOverrides(new Map())
-  }
-  const handleSetJoinOverride = (
-    idA: string,
-    idB: string,
-    join: boolean,
-  ): void => {
-    setJoinOverrides((prev) => {
-      const next = new Map(prev)
-      next.set(joinOverrideKey(idA, idB), join)
-      return next
-    })
-  }
+    setJoinOverrides(EMPTY_JOIN_OVERRIDES)
+  }, [])
+  const handleSetJoinOverride = useCallback(
+    (idA: string, idB: string, join: boolean): void => {
+      setJoinOverrides((prev) => {
+        const next = new Map(prev)
+        next.set(joinOverrideKey(idA, idB), join)
+        return next
+      })
+    },
+    [],
+  )
 
   // FR-38/NFR-3: 描画可能領域からのはみ出し検出。解消するまでG-codeのダウンロードをブロックする
   const boundsWarnings = useMemo(
@@ -238,15 +334,25 @@ function App() {
   // 読込み直後は最終ステップ(全リスト項目描画済み)を初期表示とする
   const [step, setStep] = useState(0)
   const [playing, setPlaying] = useState(false)
+  // ファイル再読込時、blocks/fillBlocksはWorkerの返信を待って非同期に確定する(listEntriesも
+  // それに伴い遅れて更新される)。そのためfitKey変化時点では即座に全展開できず、Worker処理が
+  // 完了しlistEntriesが新ファイルの内容で確定してから全展開する必要がある
+  const pendingFullRevealRef = useRef(false)
 
   useEffect(() => {
-    setStep(listEntries.length)
+    pendingFullRevealRef.current = true
     setPlaying(false)
   }, [fitKey])
 
   useEffect(() => {
+    if (isProcessing) return
+    if (pendingFullRevealRef.current) {
+      pendingFullRevealRef.current = false
+      setStep(listEntries.length)
+      return
+    }
     setStep((s) => Math.min(s, listEntries.length))
-  }, [listEntries])
+  }, [isProcessing, listEntries])
 
   useEffect(() => {
     if (!playing) return
@@ -266,18 +372,41 @@ function App() {
     return () => clearInterval(timer)
   }, [playing, step, listEntries.length])
 
-  const visibleSegmentCount = useMemo(
-    () => segmentCountPerEntry.slice(0, step).reduce((a, b) => a + b, 0),
-    [segmentCountPerEntry, step],
-  )
+  // segmentCountPerEntryの累積和。stepごとの再計算をO(N)のslice+reduceからO(1)の配列参照にする
+  const segmentCountPrefix = useMemo(() => {
+    const prefix = new Array<number>(segmentCountPerEntry.length + 1)
+    prefix[0] = 0
+    for (let i = 0; i < segmentCountPerEntry.length; i++) {
+      prefix[i + 1] = prefix[i] + segmentCountPerEntry[i]
+    }
+    return prefix
+  }, [segmentCountPerEntry])
+  const visibleSegmentCount =
+    segmentCountPrefix[Math.min(step, segmentCountPrefix.length - 1)] ?? 0
 
   const fillErrors = useMemo(
     () => fillBlocks.flatMap((fb) => (fb.error ? [fb.error] : [])),
     [fillBlocks],
   )
 
+  const handleStepChange = useCallback((next: number): void => {
+    setPlaying(false)
+    setStep(next)
+  }, [])
+  const handleTogglePlaying = useCallback((): void => {
+    setPlaying((p) => !p)
+  }, [])
+  // ストローク並び順リストの再構築(数万行になりうる)は低優先度の更新として扱い、
+  // プレビューCanvas側の即時反映をブロックしないようにする
+  const deferredStep = useDeferredValue(step)
+
   return (
     <div className="app-shell">
+      <ProcessingOverlay
+        isProcessing={isProcessing}
+        phase={processingPhase}
+        percent={processingPercent}
+      />
       <ErrorBanner errors={parseResult?.errors ?? []} />
       <BoundsWarningBanner warnings={boundsWarnings} />
       <FillErrorBanner errors={fillErrors} />
@@ -313,15 +442,12 @@ function App() {
           step={step}
           totalSteps={listEntries.length}
           playing={playing}
-          onStep={(next) => {
-            setPlaying(false)
-            setStep(next)
-          }}
-          onTogglePlaying={() => setPlaying((p) => !p)}
+          onStep={handleStepChange}
+          onTogglePlaying={handleTogglePlaying}
         />
         <StrokeListPanel
           entries={listEntries}
-          step={step}
+          step={deferredStep}
           joinOverrides={joinOverrides}
           onSetJoinOverride={handleSetJoinOverride}
           onOptimize={handleOptimize}

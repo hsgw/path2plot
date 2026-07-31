@@ -55,6 +55,11 @@ class DisjointSet {
  * 候補は距離昇順(強制結合は最優先)でグリーディに採用し、各ストロークの各端点は最大1回しか
  * 使用しない・同一連結成分への再結合(閉ループ化)は避けるという制約でチェーンを構成する。
  * overridesで明示的に false/true が指定されたペアは、距離閾値に関わらずそれぞれ非結合/結合を強制する。
+ *
+ * 候補列挙は全ペア総当たり(O(n^2))ではなく、セルサイズ=joinDistanceMmの空間ハッシュグリッドで
+ * 各端点の近傍(自セル+周囲8セル)のみを探索する。距離<=joinDistanceMmのペアはこの3x3近傍探索で
+ * 漏れなく捕捉できる(セルサイズ>=探索半径の空間ハッシュの標準的な性質)。overridesで強制結合(true)
+ * されたペアは距離に関わらず必要なため、グリッド探索とは別に個別処理する。
  */
 export function buildJoinedBlocks(
   strokes: ParsedStroke[],
@@ -64,39 +69,86 @@ export function buildJoinedBlocks(
   const n = strokes.length
   const endPoint = (i: number, end: EndName): Point =>
     end === 'start' ? strokes[i].points[0] : strokes[i].points.at(-1)!
-
-  const candidates: Candidate[] = []
   const ends: EndName[] = ['start', 'end']
 
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      const override = overrides.get(
-        joinOverrideKey(strokes[i].id, strokes[j].id),
-      )
-      if (override === false) continue
+  const bestCandidateForPair = (
+    i: number,
+    j: number,
+    forced: boolean,
+  ): Candidate => {
+    let best: Candidate | null = null
+    for (const aEnd of ends) {
+      for (const bEnd of ends) {
+        const d = dist(endPoint(i, aEnd), endPoint(j, bEnd))
+        if (!best || d < best.distance) {
+          best = { a: i, aEnd, b: j, bEnd, distance: d, forced }
+        }
+      }
+    }
+    return best!
+  }
+  const pairKey = (i: number, j: number): string =>
+    i < j ? `${i}:${j}` : `${j}:${i}`
 
-      let best: Candidate | null = null
+  const idToIndex = new Map<string, number>()
+  for (let i = 0; i < n; i++) idToIndex.set(strokes[i].id, i)
+
+  const skipPairs = new Set<string>()
+  const candidateByPair = new Map<string, Candidate>()
+
+  for (const [key, join] of overrides) {
+    const sep = key.indexOf('|')
+    const i = idToIndex.get(key.slice(0, sep))
+    const j = idToIndex.get(key.slice(sep + 1))
+    if (i === undefined || j === undefined) continue
+    if (join === false) {
+      skipPairs.add(pairKey(i, j))
+    } else {
+      candidateByPair.set(pairKey(i, j), bestCandidateForPair(i, j, true))
+    }
+  }
+
+  if (joinDistanceMm > 0) {
+    const cellSize = joinDistanceMm
+    const cellIndex = (v: number): number => Math.floor(v / cellSize)
+    const cellKey = (cx: number, cy: number): string => `${cx}:${cy}`
+    const grid = new Map<string, number[]>()
+    const addToGrid = (i: number, p: Point): void => {
+      const key = cellKey(cellIndex(p.x), cellIndex(p.y))
+      const bucket = grid.get(key)
+      if (bucket) bucket.push(i)
+      else grid.set(key, [i])
+    }
+    for (let i = 0; i < n; i++) {
+      addToGrid(i, endPoint(i, 'start'))
+      addToGrid(i, endPoint(i, 'end'))
+    }
+
+    for (let i = 0; i < n; i++) {
       for (const aEnd of ends) {
-        for (const bEnd of ends) {
-          const d = dist(endPoint(i, aEnd), endPoint(j, bEnd))
-          if (!best || d < best.distance) {
-            best = {
-              a: i,
-              aEnd,
-              b: j,
-              bEnd,
-              distance: d,
-              forced: override === true,
+        const p = endPoint(i, aEnd)
+        const cx = cellIndex(p.x)
+        const cy = cellIndex(p.y)
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dy = -1; dy <= 1; dy++) {
+            const bucket = grid.get(cellKey(cx + dx, cy + dy))
+            if (!bucket) continue
+            for (const j of bucket) {
+              if (j <= i) continue
+              const pk = pairKey(i, j)
+              if (skipPairs.has(pk) || candidateByPair.has(pk)) continue
+              const candidate = bestCandidateForPair(i, j, false)
+              if (candidate.distance <= joinDistanceMm) {
+                candidateByPair.set(pk, candidate)
+              }
             }
           }
         }
       }
-      if (!best) continue
-      if (override === true || best.distance <= joinDistanceMm) {
-        candidates.push(best)
-      }
     }
   }
+
+  const candidates = Array.from(candidateByPair.values())
 
   candidates.sort((x, y) => {
     if (x.forced !== y.forced) return x.forced ? -1 : 1

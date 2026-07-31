@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, memo, useState } from 'react'
 import { joinOverrideKey } from '../core/pathOptimize'
 import type { ListEntry, StrokeListEntry } from '../types/svg'
 
@@ -15,8 +15,11 @@ interface StrokeListPanelProps {
   onResetOrder: () => void
 }
 
-/** 隣接する2行の間に表示する結合状態トグル(FR-14の簡易な個別上書きUI)。stroke行同士のみに表示する */
-function JoinToggle({
+/**
+ * 隣接する2行の間に表示する結合状態トグル(FR-14の簡易な個別上書きUI)。stroke行同士のみに表示する。
+ * memo化し、step変更(=pendingの変化)では再レンダされないようにする
+ */
+const JoinToggle = memo(function JoinToggle({
   a,
   b,
   joinOverrides,
@@ -49,10 +52,10 @@ function JoinToggle({
       </button>
     </li>
   )
-}
+})
 
-/** FR-22: 塗りブロックの行(常にブロック単位で1行のみ、個別ハッチ線は並び替え対象としない) */
-function FillRow({
+/** FR-22: 塗りブロックの行(常にブロック単位で1行のみ、個別ハッチ線は並び替え対象としない)。memo化 */
+const FillRow = memo(function FillRow({
   entry,
   pending,
 }: {
@@ -79,9 +82,38 @@ function FillRow({
       )}
     </li>
   )
-}
+})
 
-export function StrokeListPanel({
+/**
+ * 個別ストロークの行。memo化することで、ステップ操作時に実際にpending(未描画/描画済み)が
+ * 変化した行だけが再レンダされ、リスト全体(最大数万行)の再構築を避ける
+ */
+const StrokeRow = memo(function StrokeRow({
+  entry,
+  index,
+  pending,
+  joined,
+}: {
+  entry: StrokeListEntry
+  index: number
+  pending: boolean
+  joined: boolean
+}) {
+  return (
+    <li
+      className={`stroke-list-item${pending ? ' stroke-list-item-pending' : ''}${joined ? ' stroke-list-item-joined' : ''}`}
+    >
+      <span className="stroke-list-index">{index + 1}</span>
+      <span
+        className="stroke-list-swatch"
+        style={{ backgroundColor: entry.color }}
+      />
+      <span className="stroke-list-label">{entry.sourceId ?? entry.id}</span>
+    </li>
+  )
+})
+
+function StrokeListPanelImpl({
   entries,
   step,
   joinOverrides,
@@ -139,18 +171,12 @@ export function StrokeListPanel({
                   {entry.kind === 'fill' ? (
                     <FillRow entry={entry} pending={i >= step} />
                   ) : (
-                    <li
-                      className={`stroke-list-item${i >= step ? ' stroke-list-item-pending' : ''}${sameBlockAsPrev ? ' stroke-list-item-joined' : ''}`}
-                    >
-                      <span className="stroke-list-index">{i + 1}</span>
-                      <span
-                        className="stroke-list-swatch"
-                        style={{ backgroundColor: entry.color }}
-                      />
-                      <span className="stroke-list-label">
-                        {entry.sourceId ?? entry.id}
-                      </span>
-                    </li>
+                    <StrokeRow
+                      entry={entry}
+                      index={i}
+                      pending={i >= step}
+                      joined={sameBlockAsPrev}
+                    />
                   )}
                 </Fragment>
               )
@@ -161,3 +187,5 @@ export function StrokeListPanel({
     </section>
   )
 }
+
+export const StrokeListPanel = memo(StrokeListPanelImpl)
