@@ -34,7 +34,8 @@ export interface DrawPlan {
 /**
  * 並び替え結果(FR-15)を実際に使える順序へ解決する。
  * 最適化後にファイルを読み直した直後など、ユニット構成と長さが食い違うタイミングが
- * 1レンダリングだけ生じうるため、長さが一致しない並び替え結果は破棄して出現順に戻す。
+ * 1レンダリングだけ生じうるため、長さが一致しない並び替え結果は破棄して出現順に戻す
+ * (塗りブロック内部の並び替え結果は本数の検証をmaterializeDrawUnit側で行う)。
  */
 function resolveUnitOrder(
   unitOrder: UnitOrder | null,
@@ -43,7 +44,9 @@ function resolveUnitOrder(
   if (
     unitOrder !== null &&
     unitOrder.order.length === count &&
-    unitOrder.reversed.length === count
+    unitOrder.reversed.length === count &&
+    (unitOrder.innerOrders === undefined ||
+      unitOrder.innerOrders.length === count)
   ) {
     return unitOrder
   }
@@ -60,7 +63,10 @@ export function buildDrawPlan(
   /** FR-17の塗りつぶし方式の短い表記。fill行のラベルにそのまま出す */
   fillPatternLabel: string,
 ): DrawPlan {
-  const { order, reversed } = resolveUnitOrder(unitOrder, units.length)
+  const { order, reversed, innerOrders } = resolveUnitOrder(
+    unitOrder,
+    units.length,
+  )
 
   const listEntries: ListEntry[] = []
   const previewSegments: PreviewSegment[] = []
@@ -80,6 +86,7 @@ export function buildDrawPlan(
       units[unitIndex],
       strokes,
       reversed[blockId],
+      innerOrders?.[blockId] ?? null,
     )
     drawGroups.push(...unit.gcodeSegments)
 

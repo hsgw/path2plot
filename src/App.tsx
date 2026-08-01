@@ -18,16 +18,12 @@ import { checkStrokeBounds } from './core/gcode/boundsCheck'
 import { generateGcode } from './core/gcode/generate'
 import { DEFAULT_GCODE_SETTINGS } from './core/gcode/types'
 import { buildDrawPlan } from './core/plan/drawPlan'
-import {
-  toDrawUnits,
-  materializeDrawUnit,
-  travelEndpoints,
-} from './core/plan/drawUnit'
+import { toDrawUnits } from './core/plan/drawUnit'
+import { optimizeDrawOrder } from './core/plan/optimizeOrder'
 import {
   DEFAULT_JOIN_DISTANCE_MM,
   joinOverrideKey,
 } from './core/plan/strokeJoin'
-import { greedyOptimizeOrder } from './core/plan/travelOrder'
 import type { UnitOrder } from './core/plan/types'
 import { parseSvgFile } from './core/svg/parseSvgFile'
 import { DEFAULT_PARSE_SETTINGS, type ParseSettings } from './core/svg/types'
@@ -118,10 +114,7 @@ function App() {
   )
 
   const handleOptimize = useCallback((): void => {
-    const endpoints = units
-      .map((u) => materializeDrawUnit(u, strokes, false))
-      .map(travelEndpoints)
-    setOptimizedOrder(greedyOptimizeOrder(endpoints, { x: 0, y: 0 }))
+    setOptimizedOrder(optimizeDrawOrder(units, strokes, { x: 0, y: 0 }))
   }, [units, strokes])
   const handleResetAll = useCallback((): void => {
     setOptimizedOrder(null)

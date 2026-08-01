@@ -100,6 +100,14 @@ export function connectHatchRowsZigzag(
  * なく直線距離を基準にするのは、複雑で小さな図形では「すぐ隣なのに輪郭を大きく回り込む」
  * 経路が現れ、なぞり距離で切ると却って遠くへ繋ぎ直してしまうため。
  * 「標準順で直後の断片」(=リスト上の次のライン)への接続には距離制限をかけない。
+ *
+ * ただし**なぞる距離そのもの**には、直線距離とは別に同じ値を上限として掛ける。細い矩形枠のような
+ * 形状では、1本の走査線が枠を横切ってできる左右の断片の端点がどちらも内側ループ上にあるため、
+ * 「内周の半分を大回りする」経路(実測197mm)が輪郭なぞりとして成立してしまう。この経路は
+ * そのまま実線で描かれるうえ、なぞり済み区間として記録されるので、以降の行の短い接続が軒並み
+ * overlapで拒否されチェーンが粉々になる(実測: 帯幅1mm・線間隔1mm・45°で断片284個が71本に分裂、
+ * うち接続失敗139件が全てoverlap)。直線距離の上限では「端点同士は近いが経路が長い」この経路を
+ * 切れないため、なぞり距離側の上限が必要。
  */
 export function connectHatchRowsBoustrophedon(
   rows: HatchRow[],
@@ -129,6 +137,7 @@ export function connectHatchRowsBoustrophedon(
       const traced = tracer.trace(from, to)
       if (traced.status !== 'ok') return null
       const { path } = traced
+      if (path.length > maxFallbackDistanceMm) return null
       return { points: path.vertices, commit: () => tracer.commit(path) }
     },
     maxFallbackDistanceMm,

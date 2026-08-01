@@ -33,10 +33,22 @@ export interface MaterializedDrawUnit {
   gcodeSegments: Point[][]
 }
 
-/** FR-15の貪欲法で決まった、ユニットの訪問順と各ユニットの向き反転フラグ */
-export interface UnitOrder {
+/**
+ * 並び替え結果の共通形。orderは元の添字を訪問順に並べたもの、
+ * reversedは訪問順の位置ごとの向き反転フラグ(order[i]をreversed[i]の向きで辿る)
+ */
+export interface SequenceOrder {
   order: number[]
   reversed: boolean[]
+}
+
+/**
+ * FR-15の貪欲法で決まった、ユニットの訪問順と各ユニットの向き反転フラグ。
+ * innerOrdersは塗りブロック(FR-22)の内部セグメントの並び替え結果を、
+ * ユニットと同じ訪問順の位置で保持する(内部を並び替えないユニットはnull)
+ */
+export interface UnitOrder extends SequenceOrder {
+  innerOrders?: (SequenceOrder | null)[]
 }
 
 /** FR-14: 結合ブロック適用・並び替え後のストローク。blockIdが同じものは同一の結合ブロックに属する */

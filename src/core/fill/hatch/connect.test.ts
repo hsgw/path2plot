@@ -9,6 +9,7 @@ import {
   orderHatchLinesByNearestNeighbor,
 } from './connect'
 import { distSqToSegment, isSegmentInsidePolygon } from '../../geometry/polygon'
+import { distance } from '../../geometry/vector'
 
 /** テスト既定の接続距離の上限(線間隔1mm × 既定倍率3) */
 const CONNECT_LIMIT = 3
@@ -18,6 +19,24 @@ const SQUARE_10: Point[] = [
   { x: 10, y: 0 },
   { x: 10, y: 10 },
   { x: 0, y: 10 },
+]
+
+function rect(x: number, y: number, w: number, h: number): Point[] {
+  return [
+    { x, y },
+    { x: x + w, y },
+    { x: x + w, y: y + h },
+    { x, y: y + h },
+  ]
+}
+
+/**
+ * `fixtures/user/test_thin.svg` 相当の細い矩形枠(帯幅1.06mm)。
+ * 内側ループを大回りするなぞりが成立してしまう形状の代表例
+ */
+const FRAME: Point[][] = [
+  rect(0, 0, 130.5, 72.2),
+  [...rect(1.06, 1.06, 130.5 - 2.12, 72.2 - 2.12)].reverse(),
 ]
 
 /** 40x40の外形に、逆巻き(CW)の穴を持つドーナツ */
@@ -284,6 +303,63 @@ describe('connectHatchRowsBoustrophedon(FR-18: 往復・牛耕式)', () => {
     const before = JSON.stringify(rows)
     connectHatchRowsBoustrophedon(rows, [SQUARE_10], CONNECT_LIMIT)
     expect(JSON.stringify(rows)).toBe(before)
+  })
+
+  it('細い矩形枠でも1本にまとまる(内側輪郭の大回りを許すと粉々になっていた)', () => {
+    // 枠を横切る走査線がつくる左右の断片は、隣り合う端点がどちらも内側ループ上にあるため、
+    // 「内周の半分を大回りする」なぞり(実測197mm)が成立してしまう。その区間がなぞり済みとして
+    // 記録されると以降の短い接続がoverlapで全て拒否され、断片284個が71本に分裂していた
+    for (const angleDeg of [0, 45, 90]) {
+      const rows = rowsFor(FRAME, { angleDeg, spacingMm: 1 })
+      expect(rows.reduce((s, r) => s + r.segments.length, 0)).toBeGreaterThan(
+        100,
+      )
+      expect(
+        connectHatchRowsBoustrophedon(rows, FRAME, CONNECT_LIMIT).length,
+      ).toBe(1)
+    }
+  })
+
+  it('1回の接続でなぞる距離が上限を超えない', () => {
+    for (const angleDeg of [0, 45, 90]) {
+      const rows = rowsFor(FRAME, { angleDeg, spacingMm: 1 })
+      const hatchPairs = new Set<string>()
+      for (const row of rows) {
+        for (const s of row.segments) {
+          const a = s.points[0]
+          const b = s.points.at(-1)!
+          hatchPairs.add(`${a.x},${a.y}|${b.x},${b.y}`)
+          hatchPairs.add(`${b.x},${b.y}|${a.x},${a.y}`)
+        }
+      }
+
+      let checked = 0
+      for (const chain of connectHatchRowsBoustrophedon(
+        rows,
+        FRAME,
+        CONNECT_LIMIT,
+      )) {
+        // ハッチ線でない線分の連なり(=1回の接続)ごとに、なぞった距離を合計する
+        let traced = 0
+        for (let i = 1; i <= chain.length; i++) {
+          const isHatch =
+            i < chain.length &&
+            hatchPairs.has(
+              `${chain[i - 1].x},${chain[i - 1].y}|${chain[i].x},${chain[i].y}`,
+            )
+          if (i < chain.length && !isHatch) {
+            traced += distance(chain[i - 1], chain[i])
+            continue
+          }
+          if (traced > 0) {
+            checked++
+            expect(traced).toBeLessThanOrEqual(CONNECT_LIMIT + 1e-6)
+            traced = 0
+          }
+        }
+      }
+      expect(checked).toBeGreaterThan(0)
+    }
   })
 
   it('描かれる線はハッチ線か輪郭上のなぞりだけで、塗りの内部を横切る直線を引かない', () => {
