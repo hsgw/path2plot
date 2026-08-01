@@ -1,0 +1,187 @@
+import { useState } from 'react'
+import type { FillSettings } from '../../core/fill/types'
+import type { GcodeSettings } from '../../core/gcode/types'
+import type { ParseSettings } from '../../core/svg/types'
+import { NumberField } from '../common/NumberField'
+import { FillSettingsPanel } from './FillSettingsPanel'
+import { GcodeSettingsPanel } from './GcodeSettingsPanel'
+import { SettingsActions } from './SettingsActions'
+import { useInvalidFields } from './useInvalidFields'
+
+interface SettingsPanelProps {
+  settings: ParseSettings
+  onFileSelected: (text: string, fileName: string) => void
+  onSettingsChange: (settings: ParseSettings) => void
+  onSettingsInvalidChange: (labels: string[]) => void
+  gcodeSettings: GcodeSettings
+  onGcodeSettingsChange: (settings: GcodeSettings) => void
+  onGcodeInvalidChange: (labels: string[]) => void
+  /** FR-14: 端点結合距離(mm) */
+  joinDistanceMm: number
+  onJoinDistanceChange: (joinDistanceMm: number) => void
+  onJoinPaths: () => void
+  onOptimize: () => void
+  onResetAll: () => void
+  hasEntries: boolean
+  fillSettings: FillSettings
+  onFillSettingsChange: (settings: FillSettings) => void
+  onFillInvalidChange: (labels: string[]) => void
+  canDownloadGcode: boolean
+  boundsWarningCount: number
+  onDownloadGcode: () => void
+}
+
+export function SettingsPanel({
+  settings,
+  onFileSelected,
+  onSettingsChange,
+  onSettingsInvalidChange,
+  gcodeSettings,
+  onGcodeSettingsChange,
+  onGcodeInvalidChange,
+  joinDistanceMm,
+  onJoinDistanceChange,
+  onJoinPaths,
+  onOptimize,
+  onResetAll,
+  hasEntries,
+  fillSettings,
+  onFillSettingsChange,
+  onFillInvalidChange,
+  canDownloadGcode,
+  boundsWarningCount,
+  onDownloadGcode,
+}: SettingsPanelProps) {
+  const [isOpen, setIsOpen] = useState(true)
+  // 設定項目はSVG読み込み系(読み込み・パス結合・塗りつぶし)とG-code出力系の2タブに分ける。
+  // 非表示側のタブもDOM上には残す(hidden属性)ことで、入力途中の値や不正値の報告状態が
+  // タブ切り替えでリセットされないようにする
+  const [activeTab, setActiveTab] = useState<'svg' | 'gcode'>('svg')
+  const { setValidity } = useInvalidFields(onSettingsInvalidChange)
+
+  return (
+    <section
+      className={`panel panel-settings${isOpen ? '' : ' panel-collapsed'}`}
+    >
+      <div className="panel-header">
+        {isOpen && <h2>設定</h2>}
+        <button type="button" onClick={() => setIsOpen((v) => !v)}>
+          {isOpen ? '«' : '»'}
+        </button>
+      </div>
+      {isOpen && (
+        <div className="panel-body panel-body-settings">
+          <SettingsActions
+            onFileSelected={onFileSelected}
+            onJoinPaths={onJoinPaths}
+            onOptimize={onOptimize}
+            onResetAll={onResetAll}
+            hasEntries={hasEntries}
+            canDownloadGcode={canDownloadGcode}
+            boundsWarningCount={boundsWarningCount}
+            onDownloadGcode={onDownloadGcode}
+          />
+
+          <div className="settings-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              className="settings-tab"
+              aria-selected={activeTab === 'svg'}
+              onClick={() => setActiveTab('svg')}
+            >
+              SVG
+            </button>
+            <button
+              type="button"
+              role="tab"
+              className="settings-tab"
+              aria-selected={activeTab === 'gcode'}
+              onClick={() => setActiveTab('gcode')}
+            >
+              G-code
+            </button>
+          </div>
+
+          <div
+            role="tabpanel"
+            className="settings-tabpanel"
+            hidden={activeTab !== 'svg'}
+          >
+            <div className="settings-group">
+              <h3>読み込み設定</h3>
+              <NumberField
+                label="DPI"
+                value={settings.dpi}
+                min={1}
+                step={1}
+                onCommit={(dpi) => onSettingsChange({ ...settings, dpi })}
+                onValidityChange={(valid) => setValidity('dpi', 'DPI', valid)}
+              />
+              <NumberField
+                label="倍率"
+                value={settings.scaleFactor}
+                min={0.001}
+                step={0.1}
+                onCommit={(scaleFactor) =>
+                  onSettingsChange({ ...settings, scaleFactor })
+                }
+                onValidityChange={(valid) =>
+                  setValidity('scaleFactor', '倍率', valid)
+                }
+              />
+              <NumberField
+                label="ベジェ折線化許容誤差(mm)"
+                value={settings.bezierToleranceMm}
+                min={0.001}
+                step={0.01}
+                onCommit={(bezierToleranceMm) =>
+                  onSettingsChange({ ...settings, bezierToleranceMm })
+                }
+                onValidityChange={(valid) =>
+                  setValidity(
+                    'bezierToleranceMm',
+                    'ベジェ折線化許容誤差',
+                    valid,
+                  )
+                }
+              />
+            </div>
+
+            <div className="settings-group">
+              <h3>パス結合(FR-14)</h3>
+              <NumberField
+                label="端点結合距離(mm)"
+                value={joinDistanceMm}
+                min={0}
+                step={0.1}
+                onCommit={onJoinDistanceChange}
+                onValidityChange={(valid) =>
+                  setValidity('joinDistanceMm', '端点結合距離', valid)
+                }
+              />
+            </div>
+
+            <FillSettingsPanel
+              settings={fillSettings}
+              onSettingsChange={onFillSettingsChange}
+              onInvalidFieldsChange={onFillInvalidChange}
+            />
+          </div>
+
+          <div
+            role="tabpanel"
+            className="settings-tabpanel"
+            hidden={activeTab !== 'gcode'}
+          >
+            <GcodeSettingsPanel
+              settings={gcodeSettings}
+              onSettingsChange={onGcodeSettingsChange}
+              onInvalidFieldsChange={onGcodeInvalidChange}
+            />
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}

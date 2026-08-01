@@ -1,0 +1,155 @@
+import type {
+  FillSettings,
+  HatchConnectMode,
+  HatchWaveform,
+} from '../../core/fill/types'
+import { NumberField } from '../common/NumberField'
+import type { InvalidFieldsApi } from './useInvalidFields'
+
+interface HatchSettingsFieldsProps {
+  settings: FillSettings
+  onSettingsChange: (settings: FillSettings) => void
+  setValidity: InvalidFieldsApi['setValidity']
+}
+
+/** FR-17/18: ハッチ方式(pattern==='hatch')でのみ表示する設定項目 */
+export function HatchSettingsFields({
+  settings,
+  onSettingsChange,
+  setValidity,
+}: HatchSettingsFieldsProps) {
+  const update = (patch: Partial<FillSettings>): void =>
+    onSettingsChange({ ...settings, ...patch })
+
+  return (
+    <>
+      <label className="settings-checkbox-label">
+        <input
+          type="checkbox"
+          checked={settings.crossHatch}
+          onChange={(e) => update({ crossHatch: e.target.checked })}
+        />
+        クロスハッチ(2方向を重ねる)
+      </label>
+      {settings.crossHatch && (
+        <NumberField
+          label="第2方向の角度(度)"
+          value={settings.crossAngleDeg}
+          step={1}
+          onCommit={(crossAngleDeg) => update({ crossAngleDeg })}
+          onValidityChange={(valid) =>
+            setValidity('crossAngleDeg', '第2方向の角度', valid)
+          }
+        />
+      )}
+
+      <label>
+        ハッチ線の連結
+        <select
+          value={settings.connect}
+          onChange={(e) =>
+            update({ connect: e.target.value as HatchConnectMode })
+          }
+        >
+          <option value="none">連結しない</option>
+          <option value="zigzag">ジグザグ</option>
+          <option value="boustrophedon">往復</option>
+        </select>
+      </label>
+      {settings.connect === 'zigzag' && (
+        <p className="settings-hint">
+          各行の左右の端点を交互に拾い、斜めに繋いだ一筆書きを描きます(L0→R1→L2→R3…)。
+          ハッチ線そのものは描かれません。戻り線が行間を通るため、実際の線密度は
+          線間隔から想像されるより高くなります。塗り領域の外へ出る接続は行わず、
+          その位置で線を分けます
+        </p>
+      )}
+      {settings.connect === 'boustrophedon' && (
+        <>
+          <NumberField
+            label="接続距離の上限(線間隔に対する倍率)"
+            value={settings.connectDistanceFactor}
+            min={0.1}
+            step={0.5}
+            onCommit={(connectDistanceFactor) =>
+              update({ connectDistanceFactor })
+            }
+            onValidityChange={(valid) =>
+              setValidity('connectDistanceFactor', '接続距離の上限', valid)
+            }
+          />
+          <p className="settings-hint">
+            ハッチ線を描いた上で、隣接行の同じ側の端点同士を繋いで往復させます。
+            端点同士の移動は輪郭(輪郭オフセットを設定している場合はオフセット後の輪郭)を
+            なぞる場合のみ行い、輪郭を辿れない位置(穴の境界と外形をまたぐ場合など)や
+            一度なぞった輪郭へは繋がずに線を分けます。上限は端点までの直線距離に対する
+            もので、リスト上の次のラインへの接続だけは上限を超えても許容します
+          </p>
+        </>
+      )}
+
+      {settings.connect !== 'zigzag' && (
+        <>
+          <label>
+            線の形状
+            <select
+              value={settings.waveform}
+              onChange={(e) =>
+                update({ waveform: e.target.value as HatchWaveform })
+              }
+            >
+              <option value="straight">直線</option>
+              <option value="sine">正弦波</option>
+              <option value="triangle">三角波</option>
+            </select>
+          </label>
+          {settings.waveform !== 'straight' && (
+            <>
+              <NumberField
+                label="振幅(mm)"
+                value={settings.waveAmplitudeMm}
+                min={0}
+                step={0.1}
+                onCommit={(waveAmplitudeMm) => update({ waveAmplitudeMm })}
+                onValidityChange={(valid) =>
+                  setValidity('waveAmplitudeMm', '振幅', valid)
+                }
+              />
+              <NumberField
+                label="波長(mm)"
+                value={settings.waveLengthMm}
+                min={0.01}
+                step={0.1}
+                onCommit={(waveLengthMm) => update({ waveLengthMm })}
+                onValidityChange={(valid) =>
+                  setValidity('waveLengthMm', '波長', valid)
+                }
+              />
+              {settings.waveform === 'sine' && (
+                <NumberField
+                  label="1周期あたりの分割数"
+                  value={settings.waveSegmentsPerCycle}
+                  min={2}
+                  step={1}
+                  onCommit={(waveSegmentsPerCycle) =>
+                    update({ waveSegmentsPerCycle })
+                  }
+                  onValidityChange={(valid) =>
+                    setValidity(
+                      'waveSegmentsPerCycle',
+                      '1周期あたりの分割数',
+                      valid,
+                    )
+                  }
+                />
+              )}
+              <p className="settings-hint">
+                振幅は隣接行と干渉しないよう、線間隔の半分を上限として自動的に抑えられます
+              </p>
+            </>
+          )}
+        </>
+      )}
+    </>
+  )
+}
