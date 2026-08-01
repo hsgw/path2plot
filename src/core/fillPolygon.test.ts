@@ -3,6 +3,7 @@ import type { Point } from '../types/geometry'
 import type { FillCandidate } from '../types/fill'
 import {
   clipOpenLinesToPolygon,
+  insetPolygonRaw,
   offsetPolygon,
   resolveFillPolygon,
 } from './fillPolygon'
@@ -236,5 +237,51 @@ describe('clipOpenLinesToPolygon(FR-17/19: ハッチ候補線のクリッピン�
     // (resolveFillPolygon/offsetPolygonの出力が常にこの向きで正規化されることに対応)
     const result = clipOpenLinesToPolygon([line], [outer, HOLE_10_20_CW])
     expect(result.length).toBe(2)
+  })
+})
+
+describe('insetPolygonRaw(同心オフセット・スパイラルのリング生成)', () => {
+  const SQUARE_10: Point[] = [
+    { x: 0, y: 0 },
+    { x: 10, y: 0 },
+    { x: 10, y: 10 },
+    { x: 0, y: 10 },
+  ]
+
+  it('正の値で内側へ縮小する', () => {
+    const result = insetPolygonRaw([SQUARE_10], 2)
+    expect(result.length).toBe(1)
+    const xs = result[0].map((p) => p.x)
+    expect(Math.min(...xs)).toBeCloseTo(2, 1)
+    expect(Math.max(...xs)).toBeCloseTo(8, 1)
+  })
+
+  it('掘り進めて消滅してもエラーにせず空配列を返す(offsetPolygonと異なる)', () => {
+    expect(insetPolygonRaw([SQUARE_10], 20)).toEqual([])
+    expect(offsetPolygon([SQUARE_10], 20)).toEqual({ error: 'collapsed' })
+  })
+
+  it('内側で複数の島に分裂してもエラーにせずそのまま返す(offsetPolygonと異なる)', () => {
+    // 中央がくびれたH字状。内側へ掘ると左右2つの島に分かれる
+    const hShape: Point[] = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 14 },
+      { x: 20, y: 14 },
+      { x: 20, y: 0 },
+      { x: 30, y: 0 },
+      { x: 30, y: 30 },
+      { x: 20, y: 30 },
+      { x: 20, y: 16 },
+      { x: 10, y: 16 },
+      { x: 10, y: 30 },
+      { x: 0, y: 30 },
+    ]
+    expect(positiveCount(insetPolygonRaw([hShape], 3))).toBe(2)
+    expect(offsetPolygon([hShape], 3)).toEqual({ error: 'split' })
+  })
+
+  it('輪郭が空なら空配列を返す', () => {
+    expect(insetPolygonRaw([], 1)).toEqual([])
   })
 })

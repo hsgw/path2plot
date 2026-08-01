@@ -100,6 +100,11 @@
   align-items: center;
 }
 
+.settings-group select {
+  font: inherit;
+  padding: 2px 4px;
+}
+
 .settings-group h3 {
   font-size: 12px;
   font-weight: 600;

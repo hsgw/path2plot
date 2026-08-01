@@ -18,7 +18,7 @@ export interface MaterializedDrawUnit {
   fillBlock?: FillBlock
   /**
    * G-code出力・実際のペン上げ下げ単位(1配列要素=1回のペンダウン〜アップ、向き反転も反映済み)。
-   * joinedStrokeなら常に長さ1。fillならoutlineLoops+hatchChainsの本数(0の場合もある、FR-20エラー時)
+   * joinedStrokeなら常に長さ1。fillならoutlineLoops+fillChainsの本数(0の場合もある、FR-20エラー時)
    */
   gcodeSegments: Point[][]
 }
@@ -27,10 +27,10 @@ function materializeFillBlock(
   fillBlock: FillBlock,
   overallReversed: boolean,
 ): MaterializedDrawUnit {
-  const hatchChains = overallReversed
-    ? [...fillBlock.hatchChains].reverse().map((chain) => [...chain].reverse())
-    : fillBlock.hatchChains
-  const gcodeSegments = [...(fillBlock.outlineLoops ?? []), ...hatchChains]
+  const fillChains = overallReversed
+    ? [...fillBlock.fillChains].reverse().map((chain) => [...chain].reverse())
+    : fillBlock.fillChains
+  const gcodeSegments = [...(fillBlock.outlineLoops ?? []), ...fillChains]
   return {
     kind: 'fill',
     color: fillBlock.color,

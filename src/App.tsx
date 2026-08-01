@@ -29,6 +29,7 @@ import {
   joinOverrideKey,
 } from './core/pathOptimize'
 import { type FillBlock, DEFAULT_FILL_SETTINGS } from './types/fill'
+import { describeFillPattern } from './core/fillLabel'
 import { DEFAULT_GCODE_SETTINGS } from './types/gcode'
 import type {
   HighlightRange,
@@ -136,6 +137,12 @@ function App() {
   // FR-17〜21: 塗りつぶし(ハッチング)設定。ペン(レイヤー)概念導入(Phase7)前は、
   // 全ての塗りブロックに共通の設定として全体で共有する(joinDistanceMmと同じ簡略化パターン)
   const [fillSettings, setFillSettings] = useState(DEFAULT_FILL_SETTINGS)
+  // リストのfill行に出す方式名。設定変更からWorkerの結果が返るまでの間だけ表記が先行するが、
+  // その間は行自体がpending表示になるため実害はない
+  const fillPatternLabel = useMemo(
+    () => describeFillPattern(fillSettings),
+    [fillSettings],
+  )
 
   // FR-14: 端点結合(結合ブロック化)。距離閾値+個別上書きから毎回再計算する
   const [joinDistanceMm, setJoinDistanceMm] = useState(DEFAULT_JOIN_DISTANCE_MM)
@@ -345,13 +352,14 @@ function App() {
             id: fb.id,
             sourceId: fb.sourceId,
             color: fb.color,
-            hatchLineCount: fb.hatchChains.length,
+            patternLabel: fillPatternLabel,
+            fillChainCount: fb.fillChains.length,
             outlineLoopCount: fb.outlineLoops?.length ?? 0,
             error: fb.error,
           },
         ]
       }),
-    [materializedUnits],
+    [materializedUnits, fillPatternLabel],
   )
   // segmentCountPerEntry[i]は、listEntries[i]がpreviewSegmentsにいくつの物理セグメントを
   // 寄与するか(strokeは常に1、fillはgcodeSegments本数)。FR-23のステップ(ListEntry単位)を

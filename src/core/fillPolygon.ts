@@ -72,6 +72,23 @@ export function offsetPolygon(
 }
 
 /**
+ * エラー判定を伴わない素の内側オフセット(insetMmが正で内側へ縮小)。
+ * 同心オフセット塗り・スパイラル塗りのリング生成用。内側へ掘り進めば形状が複数へ分裂したり
+ * 消滅したりするのは当然の結果なので、offsetPolygonのような破綻判定は行わず素通しする。
+ */
+export function insetPolygonRaw(paths: Point[][], insetMm: number): Point[][] {
+  if (paths.length === 0) return []
+  return inflatePathsD(
+    paths as PathsD,
+    -insetMm,
+    JoinType.Round,
+    EndType.Polygon,
+    2.0,
+    PRECISION,
+  )
+}
+
+/**
  * FR-17/19: ハッチ候補線(開放パス)を、塗り領域の輪郭(閉パス)でクリップする。
  * 1回のClipper呼び出しに全候補線をまとめて渡すことで、行ごとに呼び出す場合よりコストを抑える。
  */

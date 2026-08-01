@@ -425,7 +425,7 @@ const FillRow = memo(function FillRow({
   /** BlockRowと同様、安定した参照を受け取りキー(entry.id)を渡し返す */
   onToggleExpanded: (key: string) => void
 }) {
-  const childCount = entry.outlineLoopCount + entry.hatchLineCount
+  const childCount = entry.outlineLoopCount + entry.fillChainCount
   return (
     <li className="stroke-list-block">
       <div
@@ -449,7 +449,7 @@ const FillRow = memo(function FillRow({
           style={{ backgroundColor: entry.color }}
         />
         <span className="stroke-list-label">
-          🖌 fill({entry.hatchLineCount}本,{' '}
+          🖌 fill({entry.patternLabel} {entry.fillChainCount}本,{' '}
           {entry.outlineLoopCount > 0 ? '輪郭あり' : '輪郭なし'})
           {entry.sourceId ? ` — id="${entry.sourceId}"` : ''}
         </span>
@@ -471,14 +471,14 @@ const FillRow = memo(function FillRow({
               segmentOffset={i}
             />
           ))}
-          {Array.from({ length: entry.hatchLineCount }, (_, i) => (
+          {Array.from({ length: entry.fillChainCount }, (_, i) => (
             <FillChildRow
-              key={`hatch-${i}`}
+              key={`fill-${i}`}
               color={entry.color}
-              label={`ハッチ線 ${i + 1}`}
+              label={`塗り線 ${i + 1}`}
               entryId={entry.id}
               entryIndex={index}
-              // ハッチ線は輪郭線の後に描画されるため、セグメント番号は輪郭線の本数だけずれる
+              // 塗り線は輪郭線の後に描画されるため、セグメント番号は輪郭線の本数だけずれる
               segmentOffset={entry.outlineLoopCount + i}
             />
           ))}

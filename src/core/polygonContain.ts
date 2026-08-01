@@ -33,7 +33,8 @@ function crossesProperly(
   return t > tEps && t < 1 - tEps && u >= 0 && u <= 1
 }
 
-function distSqToSegment(p: Point, a: Point, b: Point): number {
+/** 点pから線分abまでの距離の2乗(端点でクランプ)。輪郭上の点の位置特定にも使う */
+export function distSqToSegment(p: Point, a: Point, b: Point): number {
   const dx = b.x - a.x
   const dy = b.y - a.y
   const lenSq = dx * dx + dy * dy
