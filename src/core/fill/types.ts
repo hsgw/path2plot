@@ -105,11 +105,11 @@ export const DEFAULT_FILL_SETTINGS: FillSettings = {
   drawOutline: false,
 }
 
-/** FR-20: 塗りオフセットがClipperの返り値から形状破綻と判定された場合のエラー */
+/** FR-20: 塗りオフセットがClipperの返り値から形状破綻(面積0以下への崩壊)と判定された場合のエラー */
 export interface FillGeometryError {
   fillBlockId: string
   sourceId?: string
-  kind: 'collapsed' | 'split'
+  kind: 'collapsed'
   message: string
 }
 

@@ -16,10 +16,8 @@ import { generateConcentricRings } from './concentric'
 import { generateSpiralPath } from './spiral'
 import { closeLoop } from '../geometry/polygon'
 
-function describeError(kind: FillGeometryError['kind']): string {
-  return kind === 'collapsed'
-    ? '塗りオフセットにより形状が崩壊しました(面積が0以下になりました)'
-    : '塗りオフセットにより形状が意図しない複数ポリゴンに分裂しました'
+function describeError(_kind: FillGeometryError['kind']): string {
+  return '塗りオフセットにより形状が崩壊しました(面積が0以下になりました)'
 }
 
 /** 1方向分のハッチを生成し、連結モードに応じたチェーン列にする */

@@ -174,7 +174,7 @@ describe('offsetPolygon(FR-20: 塗りオフセット・round join・形状破綻
     expect(result).toEqual({ error: 'collapsed' })
   })
 
-  it('鉄アレイ形状は括れがオフセットで分裂しsplitと判定される', () => {
+  it('鉄アレイ形状は括れがオフセットで分裂してもエラーにせず複数ポリゴンをそのまま返す', () => {
     const dumbbell: Point[] = [
       { x: 0, y: 0 },
       { x: 10, y: 0 },
@@ -191,7 +191,10 @@ describe('offsetPolygon(FR-20: 塗りオフセット・round join・形状破綻
     ]
     expect(positiveCount([dumbbell])).toBe(1)
     const result = offsetPolygon([dumbbell], 0.6)
-    expect(result).toEqual({ error: 'split' })
+    expect('paths' in result).toBe(true)
+    if ('paths' in result) {
+      expect(positiveCount(result.paths)).toBe(2)
+    }
   })
 })
 
@@ -256,12 +259,12 @@ describe('insetPolygonRaw(同心オフセット・スパイラルのリング生
     expect(Math.max(...xs)).toBeCloseTo(8, 1)
   })
 
-  it('掘り進めて消滅してもエラーにせず空配列を返す(offsetPolygonと異なる)', () => {
+  it('掘り進めて消滅してもエラーにせず空配列を返すが、offsetPolygonは面積0以下をcollapsedと判定する', () => {
     expect(insetPolygonRaw([SQUARE_10], 20)).toEqual([])
     expect(offsetPolygon([SQUARE_10], 20)).toEqual({ error: 'collapsed' })
   })
 
-  it('内側で複数の島に分裂してもエラーにせずそのまま返す(offsetPolygonと異なる)', () => {
+  it('内側で複数の島に分裂してもエラーにせずそのまま返す(offsetPolygonも同様)', () => {
     // 中央がくびれたH字状。内側へ掘ると左右2つの島に分かれる
     const hShape: Point[] = [
       { x: 0, y: 0 },
@@ -278,7 +281,11 @@ describe('insetPolygonRaw(同心オフセット・スパイラルのリング生
       { x: 0, y: 30 },
     ]
     expect(positiveCount(insetPolygonRaw([hShape], 3))).toBe(2)
-    expect(offsetPolygon([hShape], 3)).toEqual({ error: 'split' })
+    const result = offsetPolygon([hShape], 3)
+    expect('paths' in result).toBe(true)
+    if ('paths' in result) {
+      expect(positiveCount(result.paths)).toBe(2)
+    }
   })
 
   it('輪郭が空なら空配列を返す', () => {

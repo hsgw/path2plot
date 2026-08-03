@@ -6,7 +6,6 @@ import {
   JoinType,
   areaPathsD,
   inflatePathsD,
-  isPositiveD,
   unionD,
   type PathsD,
 } from 'clipper2-ts'
@@ -45,14 +44,14 @@ export function resolveFillPolygon(candidate: FillCandidate): Point[][] {
  * 符号が逆で、Clipperは正の値=外側へ拡大)。round join・Polygon終端(閉パス前提)で処理する。
  * 正のoffsetMmでは外形は縮み穴は広がる(材料側から見てどちらの境界も内側へ後退するため)。
  * 負のoffsetMmではその逆(外形が広がり穴は縮む。穴が縮みきって消えても輪郭数が減るだけなので
- * エラーではない)。オフセット結果が面積0以下、または意図しない分裂(輪郭数の増加)が生じた場合は
- * Clipperの返り値からエラーとして検出する。
+ * エラーではない)。括れのある形状が複数の島へ分裂するのも、insetPolygonRawと同様に正常な結果
+ * として素通しする(塗り生成側は複数の島・穴を1つの領域として扱える)。面積0以下に潰れた場合のみ
+ * エラーとして検出する。
  */
 export function offsetPolygon(
   paths: Point[][],
   offsetMm: number,
-): { paths: Point[][] } | { error: 'collapsed' | 'split' } {
-  const expectedIslands = (paths as PathsD).filter((p) => isPositiveD(p)).length
+): { paths: Point[][] } | { error: 'collapsed' } {
   const result = inflatePathsD(
     paths as PathsD,
     -offsetMm,
@@ -64,10 +63,6 @@ export function offsetPolygon(
 
   if (result.length === 0 || areaPathsD(result) <= 0) {
     return { error: 'collapsed' }
-  }
-  const resultIslands = result.filter((p) => isPositiveD(p)).length
-  if (resultIslands > expectedIslands) {
-    return { error: 'split' }
   }
   return { paths: result }
 }

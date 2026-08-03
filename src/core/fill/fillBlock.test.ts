@@ -87,6 +87,35 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
     expect(block.outlineLoops).toBeNull()
   })
 
+  it('塗りオフセットで括れが分裂しても両方の島に塗りが生成される', () => {
+    const dumbbell: Point[] = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 4.5 },
+      { x: 30, y: 4.5 },
+      { x: 30, y: 0 },
+      { x: 40, y: 0 },
+      { x: 40, y: 10 },
+      { x: 30, y: 10 },
+      { x: 30, y: 5.5 },
+      { x: 10, y: 5.5 },
+      { x: 10, y: 10 },
+      { x: 0, y: 10 },
+    ]
+    const [block] = buildFillBlocks([candidate([dumbbell])], {
+      ...DEFAULT_FILL_SETTINGS,
+      fillOffsetMm: 0.6,
+      angleDeg: 0,
+      spacingMm: 1,
+    })
+    expect(block.error).toBeUndefined()
+    expect(block.fillChains.length).toBeGreaterThan(0)
+    const xs = block.fillChains.flat().map((p) => p.x)
+    // 左の島(x<10付近)と右の島(x>30付近)の両方に線が引かれている
+    expect(Math.min(...xs)).toBeLessThan(10)
+    expect(Math.max(...xs)).toBeGreaterThan(30)
+  })
+
   it('enabled=falseの場合は塗りブロックを一切生成しない', () => {
     const blocks = buildFillBlocks([candidate([SQUARE_10])], {
       ...DEFAULT_FILL_SETTINGS,
