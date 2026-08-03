@@ -31,7 +31,7 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
   it('既定では輪郭線を描かず、ハッチ線だけの塗りブロックになる', () => {
     const [block] = buildFillBlocks([candidate([SQUARE_10])], {
       ...DEFAULT_FILL_SETTINGS,
-      contourOffsetMm: 0,
+      fillOffsetMm: 0,
     })
     expect(block.error).toBeUndefined()
     expect(block.color).toBe('#123456')
@@ -42,7 +42,7 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
   it('drawOutline=trueの場合は閉じた輪郭ループが加わる', () => {
     const [block] = buildFillBlocks([candidate([SQUARE_10])], {
       ...DEFAULT_FILL_SETTINGS,
-      contourOffsetMm: 0,
+      fillOffsetMm: 0,
       drawOutline: true,
     })
     expect(block.outlineLoops).not.toBeNull()
@@ -50,7 +50,23 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
     expect(block.fillChains.length).toBeGreaterThan(0)
   })
 
-  it('輪郭オフセットで形状が崩壊する場合はエラーになりハッチ・輪郭とも空になる', () => {
+  it('塗りオフセットを設定していても、輪郭線はオフセット前の元の輪郭で描かれる', () => {
+    const [block] = buildFillBlocks([candidate([SQUARE_10])], {
+      ...DEFAULT_FILL_SETTINGS,
+      fillOffsetMm: 1,
+      drawOutline: true,
+    })
+    expect(block.outlineLoops).not.toBeNull()
+    const loop = block.outlineLoops![0]
+    const xs = loop.map((p) => p.x)
+    const ys = loop.map((p) => p.y)
+    expect(Math.min(...xs)).toBeCloseTo(0)
+    expect(Math.max(...xs)).toBeCloseTo(10)
+    expect(Math.min(...ys)).toBeCloseTo(0)
+    expect(Math.max(...ys)).toBeCloseTo(10)
+  })
+
+  it('塗りオフセットで形状が崩壊する場合はエラーになりハッチ・輪郭とも空になる', () => {
     const thin: Point[] = [
       { x: 5, y: 4.5 },
       { x: 55, y: 4.5 },
@@ -59,7 +75,7 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
     ]
     const [block] = buildFillBlocks([candidate([thin])], {
       ...DEFAULT_FILL_SETTINGS,
-      contourOffsetMm: 0.6,
+      fillOffsetMm: 0.6,
     })
     expect(block.error).toEqual({
       fillBlockId: 'fill-0',
@@ -82,7 +98,7 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
   it('connect設定によりfillChainsの本数(連結度合い)が変わる', () => {
     const settingsBase = {
       ...DEFAULT_FILL_SETTINGS,
-      contourOffsetMm: 0,
+      fillOffsetMm: 0,
       angleDeg: 0,
       spacingMm: 1,
     }
@@ -101,7 +117,7 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
   it('ジグザグは各行から1点ずつ拾った折れ線になる', () => {
     const [block] = buildFillBlocks([candidate([SQUARE_10])], {
       ...DEFAULT_FILL_SETTINGS,
-      contourOffsetMm: 0,
+      fillOffsetMm: 0,
       angleDeg: 0,
       spacingMm: 1,
       connect: 'zigzag',
@@ -113,7 +129,7 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
   it('クロスハッチは2方向分のチェーンを持つ', () => {
     const settingsBase = {
       ...DEFAULT_FILL_SETTINGS,
-      contourOffsetMm: 0,
+      fillOffsetMm: 0,
       angleDeg: 0,
       crossAngleDeg: 90,
       spacingMm: 1,
@@ -132,7 +148,7 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
     const [block] = buildFillBlocks([candidate([SQUARE_10])], {
       ...DEFAULT_FILL_SETTINGS,
       pattern: 'concentric',
-      contourOffsetMm: 0,
+      fillOffsetMm: 0,
       spacingMm: 1,
       drawOutline: true,
     })
@@ -148,7 +164,7 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
     const [block] = buildFillBlocks([candidate([SQUARE_10])], {
       ...DEFAULT_FILL_SETTINGS,
       pattern: 'spiral',
-      contourOffsetMm: 0,
+      fillOffsetMm: 0,
       spacingMm: 1,
     })
     expect(block.outlineLoops).toBeNull()

@@ -83,7 +83,7 @@ export interface FillSettings {
 
   // --- 共通 ---
   overlapPercent: number
-  contourOffsetMm: number
+  fillOffsetMm: number
   drawOutline: boolean
 }
 
@@ -101,11 +101,11 @@ export const DEFAULT_FILL_SETTINGS: FillSettings = {
   connect: 'none',
   connectDistanceFactor: 3,
   overlapPercent: 0,
-  contourOffsetMm: 0,
+  fillOffsetMm: 0,
   drawOutline: false,
 }
 
-/** FR-20: 輪郭オフセットがClipperの返り値から形状破綻と判定された場合のエラー */
+/** FR-20: 塗りオフセットがClipperの返り値から形状破綻と判定された場合のエラー */
 export interface FillGeometryError {
   fillBlockId: string
   sourceId?: string

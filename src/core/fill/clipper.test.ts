@@ -101,7 +101,7 @@ describe('resolveFillPolygon(FR-16: 閉パス自動検出・evenodd/nonzero)', (
   })
 })
 
-describe('offsetPolygon(FR-20: 輪郭オフセット・round join・形状破綻判定)', () => {
+describe('offsetPolygon(FR-20: 塗りオフセット・round join・形状破綻判定)', () => {
   it('単純な正方形を内側にオフセットすると面積が縮小する', () => {
     const square: Point[] = [
       { x: 0, y: 0 },
@@ -140,7 +140,7 @@ describe('offsetPolygon(FR-20: 輪郭オフセット・round join・形状破綻
   })
 
   it('負のオフセット(外側へ拡大)で穴が縮んで消える場合はエラーにしない', () => {
-    // FR-20: 正のoffsetMmは輪郭オフセットが内側へ縮小する方向。外形は縮み、穴は逆に広がる
+    // FR-20: 正のoffsetMmは塗りオフセットが内側へ縮小する方向。外形は縮み、穴は逆に広がる
     // (材料側から見てどちらの境界も内側へ後退するため)。負のoffsetMmはその逆で、
     // 外形が外側へ広がり、穴は縮む。穴の半径(2mm)より大きく外側へ広げれば穴は閉じきる
     const outer: Point[] = [

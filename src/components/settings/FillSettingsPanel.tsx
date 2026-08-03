@@ -42,9 +42,33 @@ export function FillSettingsPanel({
       </label>
       {settings.enabled && (
         <>
+          <NumberField
+            label="塗りオフセット(mm)"
+            value={settings.fillOffsetMm}
+            step={0.1}
+            onCommit={(fillOffsetMm) => update({ fillOffsetMm })}
+            onValidityChange={(valid) =>
+              setValidity('fillOffsetMm', '塗りオフセット', valid)
+            }
+          />
+          {isHatch ? (
+            <label className="settings-checkbox-label">
+              <input
+                type="checkbox"
+                checked={settings.drawOutline}
+                onChange={(e) => update({ drawOutline: e.target.checked })}
+              />
+              輪郭線を描く(FR-21)
+            </label>
+          ) : (
+            <p className="settings-hint">
+              同心オフセット・スパイラルは最も外側のリングが輪郭そのものになるため、
+              輪郭線(FR-21)は二重描画を避けて別途描きません
+            </p>
+          )}
           <p className="settings-hint">
             ペン(レイヤー)概念導入(Phase7)前は、全ての塗りブロックに共通の設定として適用されます。
-            線幅入力欄はPhase7まで存在しないため、線間隔・輪郭オフセットの既定値算出(FR-19/FR-20)は
+            線幅入力欄はPhase7まで存在しないため、線間隔・塗りオフセットの既定値算出(FR-19/FR-20)は
             フォールバック値基準で、線の重ね量はまだ効果を持ちません
           </p>
           <label>
@@ -89,31 +113,6 @@ export function FillSettingsPanel({
               onSettingsChange={onSettingsChange}
               setValidity={setValidity}
             />
-          )}
-
-          <NumberField
-            label="輪郭オフセット(mm)"
-            value={settings.contourOffsetMm}
-            step={0.1}
-            onCommit={(contourOffsetMm) => update({ contourOffsetMm })}
-            onValidityChange={(valid) =>
-              setValidity('contourOffsetMm', '輪郭オフセット', valid)
-            }
-          />
-          {isHatch ? (
-            <label className="settings-checkbox-label">
-              <input
-                type="checkbox"
-                checked={settings.drawOutline}
-                onChange={(e) => update({ drawOutline: e.target.checked })}
-              />
-              輪郭線を描く(FR-21)
-            </label>
-          ) : (
-            <p className="settings-hint">
-              同心オフセット・スパイラルは最も外側のリングが輪郭そのものになるため、
-              輪郭線(FR-21)は二重描画を避けて別途描きません
-            </p>
           )}
         </>
       )}

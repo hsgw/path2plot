@@ -7,7 +7,7 @@ import type { FillSettings } from '../../core/fill/types'
  */
 export function visibleNumberFieldKeys(settings: FillSettings): Set<string> {
   if (!settings.enabled) return new Set()
-  const keys = ['spacingMm', 'contourOffsetMm']
+  const keys = ['spacingMm', 'fillOffsetMm']
   if (settings.pattern === 'hatch') {
     keys.push('angleDeg')
     if (settings.crossHatch) keys.push('crossAngleDeg')

@@ -18,8 +18,8 @@ import { closeLoop } from '../geometry/polygon'
 
 function describeError(kind: FillGeometryError['kind']): string {
   return kind === 'collapsed'
-    ? '輪郭オフセットにより形状が崩壊しました(面積が0以下になりました)'
-    : '輪郭オフセットにより形状が意図しない複数ポリゴンに分裂しました'
+    ? '塗りオフセットにより形状が崩壊しました(面積が0以下になりました)'
+    : '塗りオフセットにより形状が意図しない複数ポリゴンに分裂しました'
 }
 
 /** 1方向分のハッチを生成し、連結モードに応じたチェーン列にする */
@@ -82,7 +82,7 @@ function buildFillBlock(
   settings: FillSettings,
 ): FillBlock {
   const resolved = resolveFillPolygon(candidate)
-  const offsetResult = offsetPolygon(resolved, settings.contourOffsetMm)
+  const offsetResult = offsetPolygon(resolved, settings.fillOffsetMm)
 
   if ('error' in offsetResult) {
     return {
@@ -105,7 +105,7 @@ function buildFillBlock(
   const outlineIsRedundant =
     settings.pattern === 'concentric' || settings.pattern === 'spiral'
   const outlineLoops =
-    settings.drawOutline && !outlineIsRedundant ? region.map(closeLoop) : null
+    settings.drawOutline && !outlineIsRedundant ? resolved.map(closeLoop) : null
 
   return {
     id: candidate.id,

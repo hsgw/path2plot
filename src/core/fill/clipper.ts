@@ -41,7 +41,7 @@ export function resolveFillPolygon(candidate: FillCandidate): Point[][] {
 }
 
 /**
- * FR-20: 輪郭オフセット。offsetMmは「正の値=内側へ縮小」というmm側の慣習(Clipperのdelta引数とは
+ * FR-20: 塗りオフセット。offsetMmは「正の値=内側へ縮小」というmm側の慣習(Clipperのdelta引数とは
  * 符号が逆で、Clipperは正の値=外側へ拡大)。round join・Polygon終端(閉パス前提)で処理する。
  * 正のoffsetMmでは外形は縮み穴は広がる(材料側から見てどちらの境界も内側へ後退するため)。
  * 負のoffsetMmではその逆(外形が広がり穴は縮む。穴が縮みきって消えても輪郭数が減るだけなので
