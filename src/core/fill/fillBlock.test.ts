@@ -252,6 +252,62 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
     expect(plain.outlineLoops).toBeNull()
   })
 
+  it('ハッチ線の最小長さ未満の線を除外する(connect=none)', () => {
+    const settingsBase = {
+      ...DEFAULT_FILL_SETTINGS,
+      fillOffsetMm: 0,
+      angleDeg: 0,
+      spacingMm: 1,
+      connect: 'none' as const,
+    }
+    // SQUARE_10のハッチ線は全て長さ10。11を指定すると全て除外される
+    const [none] = build([candidate([SQUARE_10])], settingsBase)
+    const [filtered] = build([candidate([SQUARE_10])], {
+      ...settingsBase,
+      minHatchLineLengthMm: 11,
+    })
+    expect(none.fillChains.length).toBe(10)
+    expect(filtered.fillChains.length).toBe(0)
+  })
+
+  it('ハッチ線の最小長さ未満の線を除外する(connect=boustrophedon)', () => {
+    const settingsBase = {
+      ...DEFAULT_FILL_SETTINGS,
+      fillOffsetMm: 0,
+      angleDeg: 0,
+      spacingMm: 1,
+      connect: 'boustrophedon' as const,
+    }
+    const [filtered] = build([candidate([SQUARE_10])], {
+      ...settingsBase,
+      minHatchLineLengthMm: 11,
+    })
+    expect(filtered.fillChains).toEqual([])
+  })
+
+  it('ジグザグは接続前の個々のハッチ線ではなく、接続後の結果に対して最小長さを判定する', () => {
+    const settingsBase = {
+      ...DEFAULT_FILL_SETTINGS,
+      fillOffsetMm: 0,
+      angleDeg: 0,
+      spacingMm: 1,
+      connect: 'zigzag' as const,
+    }
+    // 個々のハッチ線(長さ10)は11未満で全て除外対象だが、zigzagの接続結果(1本の折れ線)は
+    // 始点-終点の直線距離が10より大きいため、11では除外されない
+    const [notFiltered] = build([candidate([SQUARE_10])], {
+      ...settingsBase,
+      minHatchLineLengthMm: 11,
+    })
+    expect(notFiltered.fillChains.length).toBe(1)
+    // 接続結果そのものより長い閾値を指定すれば除外される
+    const [filtered] = build([candidate([SQUARE_10])], {
+      ...settingsBase,
+      minHatchLineLengthMm: 1000,
+    })
+    expect(filtered.fillChains).toEqual([])
+  })
+
   it('グローバルenabled=falseでも、個別上書きでenabled=trueにしたfillは生成される', () => {
     const overrides = new Map<string, Partial<FillSettings>>([
       ['fill-0', { enabled: true }],

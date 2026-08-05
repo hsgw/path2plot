@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { Point } from '../../geometry/types'
 import type { HatchParams } from './lines'
-import { flattenHatchRows, generateHatchLines } from './lines'
+import {
+  filterChainsByMinLength,
+  filterHatchRowsByMinLength,
+  flattenHatchRows,
+  generateHatchLines,
+} from './lines'
 import { apply, rotateDeg } from '../../geometry/matrix'
 
 const SQUARE_10: Point[] = [
@@ -212,5 +217,45 @@ describe('generateHatchLines(波形モード)', () => {
       }),
     )
     expect(rows.map((r) => r.rowIndex)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+  })
+})
+
+describe('filterHatchRowsByMinLength', () => {
+  it('0以下は無効(何も除外しない)', () => {
+    const rows = generateHatchLines([SQUARE_10], params())
+    expect(filterHatchRowsByMinLength(rows, 0)).toEqual(rows)
+    expect(filterHatchRowsByMinLength(rows, -1)).toEqual(rows)
+  })
+
+  it('始点-終点の直線距離が閾値未満の断片を除外し、断片が0本になった行ごと落とす', () => {
+    const rows = generateHatchLines([SQUARE_10], params())
+    // 全断片が長さ10(0〜10行とも水平に横断)なので、11で全て除外される
+    expect(filterHatchRowsByMinLength(rows, 11)).toEqual([])
+    // 9なら全て残る
+    expect(flattenHatchRows(filterHatchRowsByMinLength(rows, 9)).length).toBe(
+      10,
+    )
+  })
+})
+
+describe('filterChainsByMinLength', () => {
+  const chains = [
+    [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+    ],
+    [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+    ],
+  ]
+
+  it('0以下は無効(何も除外しない)', () => {
+    expect(filterChainsByMinLength(chains, 0)).toEqual(chains)
+  })
+
+  it('始点-終点の直線距離が閾値未満のチェーンを除外する', () => {
+    expect(filterChainsByMinLength(chains, 5)).toEqual([chains[0]])
+    expect(filterChainsByMinLength(chains, 100)).toEqual([])
   })
 })

@@ -9,7 +9,7 @@ export function visibleNumberFieldKeys(settings: FillSettings): Set<string> {
   if (!settings.enabled) return new Set()
   const keys = ['spacingMm', 'fillOffsetMm']
   if (settings.pattern === 'hatch') {
-    keys.push('angleDeg')
+    keys.push('angleDeg', 'minHatchLineLengthMm')
     if (settings.crossHatch) keys.push('crossAngleDeg')
     if (settings.connect === 'boustrophedon') keys.push('connectDistanceFactor')
     // ジグザグは行の端点しか使わないため波形は結果に現れず、欄自体を出さない

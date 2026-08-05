@@ -42,15 +42,6 @@ export function FillSettingsPanel({
       </label>
       {settings.enabled && (
         <>
-          <NumberField
-            label="塗りオフセット(mm)"
-            value={settings.fillOffsetMm}
-            step={0.1}
-            onCommit={(fillOffsetMm) => update({ fillOffsetMm })}
-            onValidityChange={(valid) =>
-              setValidity('fillOffsetMm', '塗りオフセット', valid)
-            }
-          />
           {isHatch ? (
             <label className="settings-checkbox-label">
               <input
@@ -66,6 +57,15 @@ export function FillSettingsPanel({
               輪郭線(FR-21)は二重描画を避けて別途描きません
             </p>
           )}
+          <NumberField
+            label="塗りオフセット(mm)"
+            value={settings.fillOffsetMm}
+            step={0.1}
+            onCommit={(fillOffsetMm) => update({ fillOffsetMm })}
+            onValidityChange={(valid) =>
+              setValidity('fillOffsetMm', '塗りオフセット', valid)
+            }
+          />
           <p className="settings-hint">
             ペン(レイヤー)概念導入(Phase7)前は、全ての塗りブロックに共通の設定として適用されます。
             線幅入力欄はPhase7まで存在しないため、線間隔・塗りオフセットの既定値算出(FR-19/FR-20)は

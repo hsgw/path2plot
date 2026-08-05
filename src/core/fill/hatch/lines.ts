@@ -181,3 +181,41 @@ export function generateHatchLines(
 export function flattenHatchRows(rows: HatchRow[]): Point[][] {
   return rows.flatMap((row) => row.segments.map((s) => s.points))
 }
+
+/** 始点-終点の直線距離(ハッチ線・チェーンの「長さ」の基準として使う) */
+function endpointDistance(points: Point[]): number {
+  const a = points[0]
+  const b = points.at(-1)!
+  return Math.hypot(b.x - a.x, b.y - a.y)
+}
+
+/**
+ * connect==='none'/'boustrophedon'用: 接続前の個々のハッチ線から、始点-終点の直線距離が
+ * minLengthMm未満のものを除外する。除外後に断片が0本になった行は行自体を落とす
+ */
+export function filterHatchRowsByMinLength(
+  rows: HatchRow[],
+  minLengthMm: number,
+): HatchRow[] {
+  if (minLengthMm <= 0) return rows
+  const result: HatchRow[] = []
+  for (const row of rows) {
+    const segments = row.segments.filter(
+      (s) => endpointDistance(s.points) >= minLengthMm,
+    )
+    if (segments.length > 0) result.push({ ...row, segments })
+  }
+  return result
+}
+
+/**
+ * connect==='zigzag'用: 接続済みのチェーンから、始点-終点の直線距離がminLengthMm未満のものを
+ * 除外する(zigzagは行の端点だけを使って接続するため、個々のハッチ線ではなく接続結果に対して行う)
+ */
+export function filterChainsByMinLength(
+  chains: Point[][],
+  minLengthMm: number,
+): Point[][] {
+  if (minLengthMm <= 0) return chains
+  return chains.filter((c) => endpointDistance(c) >= minLengthMm)
+}

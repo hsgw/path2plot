@@ -64,6 +64,14 @@ export interface FillSettings {
   /** waveform==='sine'のみで使用。1周期あたりの分割数 */
   waveSegmentsPerCycle: number
 
+  /**
+   * ハッチ線の最小長さ(mm)。0以下なら無効(除外しない)。始点-終点の直線距離がこの値未満の
+   * ハッチ線を細切れノイズとして除外する。connectごとに適用タイミングが異なる:
+   * 'none'/'boustrophedon' … 個々のハッチ線に対して接続前にフィルタする
+   * 'zigzag'                … 行の端点だけを使うため未フィルタのまま接続し、結果のチェーンをフィルタする
+   */
+  minHatchLineLengthMm: number
+
   // --- 連結 ---
   /**
    * ジグザグには距離のしきい値がない(斜めの接続線は行の長さに比例して長くなるため、
@@ -98,6 +106,7 @@ export const DEFAULT_FILL_SETTINGS: FillSettings = {
   waveAmplitudeMm: 0.25,
   waveLengthMm: 2,
   waveSegmentsPerCycle: 8,
+  minHatchLineLengthMm: 0,
   connect: 'none',
   connectDistanceFactor: 3,
   overlapPercent: 0,

@@ -43,6 +43,22 @@ export function HatchSettingsFields({
         />
       )}
 
+      <NumberField
+        label="ハッチ線の最小長さ(mm)"
+        value={settings.minHatchLineLengthMm}
+        min={0}
+        step={0.1}
+        onCommit={(minHatchLineLengthMm) => update({ minHatchLineLengthMm })}
+        onValidityChange={(valid) =>
+          setValidity('minHatchLineLengthMm', 'ハッチ線の最小長さ', valid)
+        }
+      />
+      <p className="settings-hint">
+        始点-終点の直線距離がこの長さ未満のハッチ線を除外します(0で無効)。「連結しない」「往復」は
+        接続前の個々のハッチ線を対象に、「ジグザグ」は行の端点だけで接続するため接続後の結果を
+        対象に判定します
+      </p>
+
       <label>
         ハッチ線の連結
         <select

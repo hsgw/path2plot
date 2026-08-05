@@ -7,7 +7,12 @@ import type {
 } from './types'
 import { offsetPolygon, resolveFillPolygon } from './clipper'
 import { resolveEffectiveFillSettings } from './overrides'
-import { flattenHatchRows, generateHatchLines } from './hatch/lines'
+import {
+  filterChainsByMinLength,
+  filterHatchRowsByMinLength,
+  flattenHatchRows,
+  generateHatchLines,
+} from './hatch/lines'
 import {
   connectHatchRowsBoustrophedon,
   connectHatchRowsZigzag,
@@ -38,16 +43,32 @@ function buildHatchChains(
 
   switch (settings.connect) {
     case 'zigzag':
-      return connectHatchRowsZigzag(rows, region)
-    case 'boustrophedon':
-      return connectHatchRowsBoustrophedon(
+      // zigzagは行の端点だけを使って接続するため、個々のハッチ線ではなく
+      // 全ハッチ線で接続した後の結果に対して最小長フィルタをかける
+      return filterChainsByMinLength(
+        connectHatchRowsZigzag(rows, region),
+        settings.minHatchLineLengthMm,
+      )
+    case 'boustrophedon': {
+      // 往復は接続前に短いハッチ線を除外してから接続する
+      const filteredRows = filterHatchRowsByMinLength(
         rows,
+        settings.minHatchLineLengthMm,
+      )
+      return connectHatchRowsBoustrophedon(
+        filteredRows,
         region,
         settings.spacingMm * settings.connectDistanceFactor,
       )
-    default:
-      // 連結しない場合も、訪問順序・向きだけは最適化してペンアップ移動距離を減らす
-      return orderHatchLinesAsChains(flattenHatchRows(rows))
+    }
+    default: {
+      // 連結しない場合も、短いハッチ線を除外してから訪問順序・向きだけを最適化する
+      const filteredRows = filterHatchRowsByMinLength(
+        rows,
+        settings.minHatchLineLengthMm,
+      )
+      return orderHatchLinesAsChains(flattenHatchRows(filteredRows))
+    }
   }
 }
 
