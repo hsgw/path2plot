@@ -15,6 +15,7 @@ export interface FillProcessingRequest {
   requestId: number
   fillCandidates: FillCandidate[]
   fillSettings: FillSettings
+  fillOverrides: Map<string, Partial<FillSettings>>
 }
 
 export interface JoinProcessingRequest {

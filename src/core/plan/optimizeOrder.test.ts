@@ -170,7 +170,7 @@ describe('optimizeDrawOrder', () => {
     )
     const order = optimizeDrawOrder(units, [], ORIGIN)
 
-    const plan = buildDrawPlan(units, [], order, 'ハッチ')
+    const plan = buildDrawPlan(units, [], order, new Map(), new Set())
 
     expect(plan.drawGroups.map((g) => g[0])).toEqual([
       { x: 1, y: 0 },

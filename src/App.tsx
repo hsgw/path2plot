@@ -2,7 +2,11 @@ import { useCallback, useDeferredValue, useMemo, useState } from 'react'
 import './App.css'
 import { downloadTextFile, gcodeFileNameFor } from './app/downloadFile'
 import { useHighlightSelection } from './app/useHighlightSelection'
-import { EMPTY_JOIN_OVERRIDES, useProcessing } from './app/useProcessing'
+import {
+  EMPTY_FILL_OVERRIDES,
+  EMPTY_JOIN_OVERRIDES,
+  useProcessing,
+} from './app/useProcessing'
 import { useStepPlayback } from './app/useStepPlayback'
 import { BoundsWarningBanner } from './components/banners/BoundsWarningBanner'
 import { FillErrorBanner } from './components/banners/FillErrorBanner'
@@ -13,7 +17,8 @@ import { PreviewPanel } from './components/preview/PreviewPanel'
 import { SettingsPanel } from './components/settings/SettingsPanel'
 import { StrokeListPanel } from './components/strokeList/StrokeListPanel'
 import { describeFillPattern } from './core/fill/label'
-import { DEFAULT_FILL_SETTINGS } from './core/fill/types'
+import { resolveEffectiveFillSettings } from './core/fill/overrides'
+import { DEFAULT_FILL_SETTINGS, type FillSettings } from './core/fill/types'
 import { checkStrokeBounds } from './core/gcode/boundsCheck'
 import { generateGcode } from './core/gcode/generate'
 import { DEFAULT_GCODE_SETTINGS } from './core/gcode/types'
@@ -39,6 +44,9 @@ function App() {
   // FR-17〜21: 塗りつぶし設定。ペン(レイヤー)概念導入(Phase7)前は、
   // 全ての塗りブロックに共通の設定として全体で共有する(joinDistanceMmと同じ簡略化パターン)
   const [fillSettings, setFillSettings] = useState(DEFAULT_FILL_SETTINGS)
+  // 塗りの個別上書き(fillId→変更されたフィールドのみ)。未上書きのフィールドはfillSettingsへ追従する
+  const [fillOverrides, setFillOverrides] =
+    useState<Map<string, Partial<FillSettings>>>(EMPTY_FILL_OVERRIDES)
   // FR-14: 端点結合。距離閾値+個別上書きから毎回再計算する
   const [joinDistanceMm, setJoinDistanceMm] = useState(DEFAULT_JOIN_DISTANCE_MM)
   const [joinOverrides, setJoinOverrides] =
@@ -72,6 +80,7 @@ function App() {
   const processing = useProcessing({
     parseResult,
     fillSettings,
+    fillOverrides,
     joinDistanceMm,
     joinOverrides,
   })
@@ -88,15 +97,37 @@ function App() {
   const optimizeApplied =
     optimizedOrder !== null && optimizedOrder.order.length === units.length
 
-  // リストのfill行に出す方式名。設定変更からWorkerの結果が返るまでの間だけ表記が先行するが、
+  // リストのfill行に出す方式名(fillId→ラベル)。個別上書きで方式が変わる場合があるため
+  // fillごとの実効設定から計算する。設定変更からWorkerの結果が返るまでの間だけ表記が先行するが、
   // その間は行自体がpending表示になるため実害はない
-  const fillPatternLabel = useMemo(
-    () => describeFillPattern(fillSettings),
-    [fillSettings],
+  const fillPatternLabels = useMemo(() => {
+    const candidates = parseResult?.fillCandidates ?? []
+    return new Map(
+      candidates.map((candidate) => [
+        candidate.id,
+        describeFillPattern(
+          resolveEffectiveFillSettings(
+            fillSettings,
+            fillOverrides.get(candidate.id),
+          ),
+        ),
+      ]),
+    )
+  }, [parseResult, fillSettings, fillOverrides])
+  const overriddenFillIds = useMemo(
+    () => new Set(fillOverrides.keys()),
+    [fillOverrides],
   )
   const plan = useMemo(
-    () => buildDrawPlan(units, strokes, optimizedOrder, fillPatternLabel),
-    [units, strokes, optimizedOrder, fillPatternLabel],
+    () =>
+      buildDrawPlan(
+        units,
+        strokes,
+        optimizedOrder,
+        fillPatternLabels,
+        overriddenFillIds,
+      ),
+    [units, strokes, optimizedOrder, fillPatternLabels, overriddenFillIds],
   )
 
   const playback = useStepPlayback({
@@ -119,6 +150,7 @@ function App() {
   const handleResetAll = useCallback((): void => {
     setOptimizedOrder(null)
     setJoinOverrides(EMPTY_JOIN_OVERRIDES)
+    setFillOverrides(EMPTY_FILL_OVERRIDES)
     processing.resetJoin()
   }, [processing])
   const handleFileSelected = useCallback((text: string, name: string): void => {
@@ -127,6 +159,7 @@ function App() {
     setLoadId((id) => id + 1)
     setOptimizedOrder(null)
     setJoinOverrides((prev) => (prev.size === 0 ? prev : EMPTY_JOIN_OVERRIDES))
+    setFillOverrides((prev) => (prev.size === 0 ? prev : EMPTY_FILL_OVERRIDES))
   }, [])
   const handleSetJoinOverride = useCallback(
     (idA: string, idB: string, join: boolean): void => {
@@ -138,6 +171,24 @@ function App() {
     },
     [],
   )
+  const handlePatchFillOverride = useCallback(
+    (fillId: string, patch: Partial<FillSettings>): void => {
+      setFillOverrides((prev) => {
+        const next = new Map(prev)
+        next.set(fillId, { ...next.get(fillId), ...patch })
+        return next
+      })
+    },
+    [],
+  )
+  const handleResetFillOverride = useCallback((fillId: string): void => {
+    setFillOverrides((prev) => {
+      if (!prev.has(fillId)) return prev
+      const next = new Map(prev)
+      next.delete(fillId)
+      return next
+    })
+  }, [])
 
   // FR-38/NFR-3: 描画可能領域からのはみ出し検出。解消するまでG-codeのダウンロードをブロックする
   const boundsWarnings = useMemo(
@@ -197,7 +248,9 @@ function App() {
           onResetAll={handleResetAll}
           hasEntries={plan.listEntries.length > 0}
           fillSettings={fillSettings}
-          onFillSettingsChange={setFillSettings}
+          onFillSettingsChange={(patch) =>
+            setFillSettings((prev) => ({ ...prev, ...patch }))
+          }
           onFillInvalidChange={setFillInvalidLabels}
           canDownloadGcode={canDownloadGcode}
           boundsWarningCount={boundsWarnings.length}
@@ -227,6 +280,10 @@ function App() {
           step={deferredStep}
           joinOverrides={joinOverrides}
           onSetJoinOverride={handleSetJoinOverride}
+          fillSettings={fillSettings}
+          fillOverrides={fillOverrides}
+          onPatchFillOverride={handlePatchFillOverride}
+          onResetFillOverride={handleResetFillOverride}
           selectedKey={highlight.selectedKey}
           onHover={highlight.onHover}
           onSelect={highlight.onSelect}

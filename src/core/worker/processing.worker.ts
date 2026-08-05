@@ -10,9 +10,13 @@ self.onmessage = (event: MessageEvent<ProcessingRequest>) => {
   const request = event.data
 
   if (request.kind === 'fill') {
-    const { requestId, fillCandidates, fillSettings } = request
+    const { requestId, fillCandidates, fillSettings, fillOverrides } = request
     post({ requestId, type: 'progress', phase: 'fill', percent: 0 })
-    const fillBlocks = buildFillBlocks(fillCandidates, fillSettings)
+    const fillBlocks = buildFillBlocks(
+      fillCandidates,
+      fillSettings,
+      fillOverrides,
+    )
     post({ requestId, type: 'fill-done', fillBlocks })
     return
   }

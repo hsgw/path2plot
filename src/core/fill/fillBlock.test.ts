@@ -7,6 +7,15 @@ import {
 } from './types'
 import { buildFillBlocks } from './fillBlock'
 
+const NO_OVERRIDES: Map<string, Partial<FillSettings>> = new Map()
+/** テストでは個別上書きを使わないため、overrides引数を省略できるようにする薄いラッパー */
+function build(
+  candidates: FillCandidate[],
+  settings: FillSettings,
+): ReturnType<typeof buildFillBlocks> {
+  return buildFillBlocks(candidates, settings, NO_OVERRIDES)
+}
+
 function candidate(
   contours: Point[][],
   overrides: Partial<FillCandidate> = {},
@@ -29,7 +38,7 @@ const SQUARE_10: Point[] = [
 
 describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケストレーション)', () => {
   it('既定では輪郭線を描かず、ハッチ線だけの塗りブロックになる', () => {
-    const [block] = buildFillBlocks([candidate([SQUARE_10])], {
+    const [block] = build([candidate([SQUARE_10])], {
       ...DEFAULT_FILL_SETTINGS,
       fillOffsetMm: 0,
     })
@@ -40,7 +49,7 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
   })
 
   it('drawOutline=trueの場合は閉じた輪郭ループが加わる', () => {
-    const [block] = buildFillBlocks([candidate([SQUARE_10])], {
+    const [block] = build([candidate([SQUARE_10])], {
       ...DEFAULT_FILL_SETTINGS,
       fillOffsetMm: 0,
       drawOutline: true,
@@ -51,7 +60,7 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
   })
 
   it('塗りオフセットを設定していても、輪郭線はオフセット前の元の輪郭で描かれる', () => {
-    const [block] = buildFillBlocks([candidate([SQUARE_10])], {
+    const [block] = build([candidate([SQUARE_10])], {
       ...DEFAULT_FILL_SETTINGS,
       fillOffsetMm: 1,
       drawOutline: true,
@@ -73,7 +82,7 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
       { x: 55, y: 5.5 },
       { x: 5, y: 5.5 },
     ]
-    const [block] = buildFillBlocks([candidate([thin])], {
+    const [block] = build([candidate([thin])], {
       ...DEFAULT_FILL_SETTINGS,
       fillOffsetMm: 0.6,
     })
@@ -102,7 +111,7 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
       { x: 10, y: 10 },
       { x: 0, y: 10 },
     ]
-    const [block] = buildFillBlocks([candidate([dumbbell])], {
+    const [block] = build([candidate([dumbbell])], {
       ...DEFAULT_FILL_SETTINGS,
       fillOffsetMm: 0.6,
       angleDeg: 0,
@@ -117,7 +126,7 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
   })
 
   it('enabled=falseの場合は塗りブロックを一切生成しない', () => {
-    const blocks = buildFillBlocks([candidate([SQUARE_10])], {
+    const blocks = build([candidate([SQUARE_10])], {
       ...DEFAULT_FILL_SETTINGS,
       enabled: false,
     })
@@ -132,7 +141,7 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
       spacingMm: 1,
     }
     const chainsFor = (connect: FillSettings['connect']): number =>
-      buildFillBlocks([candidate([SQUARE_10])], {
+      build([candidate([SQUARE_10])], {
         ...settingsBase,
         connect,
       })[0].fillChains.length
@@ -144,7 +153,7 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
   })
 
   it('ジグザグは各行から1点ずつ拾った折れ線になる', () => {
-    const [block] = buildFillBlocks([candidate([SQUARE_10])], {
+    const [block] = build([candidate([SQUARE_10])], {
       ...DEFAULT_FILL_SETTINGS,
       fillOffsetMm: 0,
       angleDeg: 0,
@@ -164,8 +173,8 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
       spacingMm: 1,
       connect: 'none' as const,
     }
-    const [single] = buildFillBlocks([candidate([SQUARE_10])], settingsBase)
-    const [cross] = buildFillBlocks([candidate([SQUARE_10])], {
+    const [single] = build([candidate([SQUARE_10])], settingsBase)
+    const [cross] = build([candidate([SQUARE_10])], {
       ...settingsBase,
       crossHatch: true,
     })
@@ -174,7 +183,7 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
   })
 
   it('同心オフセットはリング群を生成し、輪郭線は二重描画を避けて生成しない', () => {
-    const [block] = buildFillBlocks([candidate([SQUARE_10])], {
+    const [block] = build([candidate([SQUARE_10])], {
       ...DEFAULT_FILL_SETTINGS,
       pattern: 'concentric',
       fillOffsetMm: 0,
@@ -190,7 +199,7 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
   })
 
   it('スパイラルは同心リングを1本につないだチェーンになる', () => {
-    const [block] = buildFillBlocks([candidate([SQUARE_10])], {
+    const [block] = build([candidate([SQUARE_10])], {
       ...DEFAULT_FILL_SETTINGS,
       pattern: 'spiral',
       fillOffsetMm: 0,
@@ -198,5 +207,41 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
     })
     expect(block.outlineLoops).toBeNull()
     expect(block.fillChains.length).toBe(1)
+  })
+
+  it('個別上書きは対象のfillだけに適用され、他はグローバル設定に従う', () => {
+    const settings = {
+      ...DEFAULT_FILL_SETTINGS,
+      fillOffsetMm: 0,
+      drawOutline: false,
+    }
+    const overrides = new Map<string, Partial<FillSettings>>([
+      ['fill-0', { drawOutline: true }],
+    ])
+    const [overridden, plain] = buildFillBlocks(
+      [
+        candidate([SQUARE_10], { id: 'fill-0' }),
+        candidate([SQUARE_10], { id: 'fill-1' }),
+      ],
+      settings,
+      overrides,
+    )
+    expect(overridden.outlineLoops).not.toBeNull()
+    expect(plain.outlineLoops).toBeNull()
+  })
+
+  it('グローバルenabled=falseでも、個別上書きでenabled=trueにしたfillは生成される', () => {
+    const overrides = new Map<string, Partial<FillSettings>>([
+      ['fill-0', { enabled: true }],
+    ])
+    const blocks = buildFillBlocks(
+      [
+        candidate([SQUARE_10], { id: 'fill-0' }),
+        candidate([SQUARE_10], { id: 'fill-1' }),
+      ],
+      { ...DEFAULT_FILL_SETTINGS, enabled: false },
+      overrides,
+    )
+    expect(blocks.map((b) => b.id)).toEqual(['fill-0'])
   })
 })

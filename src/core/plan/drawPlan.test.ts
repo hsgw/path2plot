@@ -57,9 +57,19 @@ const fillBlock: FillBlock = {
   ],
 }
 
+const EMPTY_OVERRIDDEN: Set<string> = new Set()
+const labels = (label: string): Map<string, string> =>
+  new Map([['fill-0', label]])
+
 describe('buildDrawPlan', () => {
   it('結合ブロックはストロークごとに行を作り、先頭だけがペンアップ移動を伴う', () => {
-    const plan = buildDrawPlan(toDrawUnits(blocks, []), strokes, null, 'ハッチ')
+    const plan = buildDrawPlan(
+      toDrawUnits(blocks, []),
+      strokes,
+      null,
+      labels('ハッチ'),
+      EMPTY_OVERRIDDEN,
+    )
 
     expect(plan.listEntries.map((e) => e.kind)).toEqual([
       'stroke',
@@ -87,7 +97,8 @@ describe('buildDrawPlan', () => {
       toDrawUnits([], [fillBlock]),
       strokes,
       null,
-      'ハッチ/往復',
+      labels('ハッチ/往復'),
+      EMPTY_OVERRIDDEN,
     )
 
     expect(plan.listEntries).toHaveLength(1)
@@ -110,7 +121,8 @@ describe('buildDrawPlan', () => {
       toDrawUnits(blocks, []),
       strokes,
       { order: [1, 0], reversed: [false, true] },
-      'ハッチ',
+      labels('ハッチ'),
+      EMPTY_OVERRIDDEN,
     )
 
     // 単独ブロック(c)が先、続いて反転したa+bブロック
@@ -123,7 +135,8 @@ describe('buildDrawPlan', () => {
       toDrawUnits(blocks, []),
       strokes,
       { order: [0, 1, 2, 3], reversed: [false, false, false, false] },
-      'ハッチ',
+      labels('ハッチ'),
+      EMPTY_OVERRIDDEN,
     )
 
     expect(plan.listEntries.map((e) => e.id)).toEqual(['a', 'b', 'c'])
@@ -134,7 +147,8 @@ describe('buildDrawPlan', () => {
       toDrawUnits(blocks, [fillBlock]),
       strokes,
       null,
-      'ハッチ',
+      labels('ハッチ'),
+      EMPTY_OVERRIDDEN,
     )
 
     expect(plan.segmentCountPrefix).toHaveLength(plan.listEntries.length + 1)

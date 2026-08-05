@@ -8,7 +8,8 @@ import type { InvalidFieldsApi } from './useInvalidFields'
 
 interface HatchSettingsFieldsProps {
   settings: FillSettings
-  onSettingsChange: (settings: FillSettings) => void
+  /** 変更されたフィールドだけを渡す(呼び出し側が現在値へのマージを担う) */
+  onSettingsChange: (patch: Partial<FillSettings>) => void
   setValidity: InvalidFieldsApi['setValidity']
 }
 
@@ -18,8 +19,7 @@ export function HatchSettingsFields({
   onSettingsChange,
   setValidity,
 }: HatchSettingsFieldsProps) {
-  const update = (patch: Partial<FillSettings>): void =>
-    onSettingsChange({ ...settings, ...patch })
+  const update = onSettingsChange
 
   return (
     <>

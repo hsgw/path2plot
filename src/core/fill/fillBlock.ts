@@ -6,6 +6,7 @@ import type {
   FillSettings,
 } from './types'
 import { offsetPolygon, resolveFillPolygon } from './clipper'
+import { resolveEffectiveFillSettings } from './overrides'
 import { flattenHatchRows, generateHatchLines } from './hatch/lines'
 import {
   connectHatchRowsBoustrophedon,
@@ -114,10 +115,21 @@ function buildFillBlock(
   }
 }
 
+/**
+ * fillごとの個別上書きを解決してから塗りブロックを生成する。グローバルのenabled=falseでも
+ * 個別上書きでenabled=trueにしたcandidateはそのfillだけ生成する
+ */
 export function buildFillBlocks(
   candidates: FillCandidate[],
   settings: FillSettings,
+  overrides: Map<string, Partial<FillSettings>>,
 ): FillBlock[] {
-  if (!settings.enabled) return []
-  return candidates.map((candidate) => buildFillBlock(candidate, settings))
+  return candidates.flatMap((candidate) => {
+    const effective = resolveEffectiveFillSettings(
+      settings,
+      overrides.get(candidate.id),
+    )
+    if (!effective.enabled) return []
+    return [buildFillBlock(candidate, effective)]
+  })
 }

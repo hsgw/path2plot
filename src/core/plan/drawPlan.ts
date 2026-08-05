@@ -60,8 +60,10 @@ export function buildDrawPlan(
   units: DrawUnit[],
   strokes: ParsedStroke[],
   unitOrder: UnitOrder | null,
-  /** FR-17の塗りつぶし方式の短い表記。fill行のラベルにそのまま出す */
-  fillPatternLabel: string,
+  /** FR-17の塗りつぶし方式の短い表記(fillId→ラベル)。個別上書きでfillごとに変わりうる */
+  fillPatternLabels: Map<string, string>,
+  /** 個別上書きが設定済みのfill idの集合 */
+  overriddenFillIds: Set<string>,
 ): DrawPlan {
   const { order, reversed, innerOrders } = resolveUnitOrder(
     unitOrder,
@@ -115,9 +117,10 @@ export function buildDrawPlan(
         id: fillBlock.id,
         sourceId: fillBlock.sourceId,
         color: fillBlock.color,
-        patternLabel: fillPatternLabel,
+        patternLabel: fillPatternLabels.get(fillBlock.id) ?? '',
         fillChainCount: fillBlock.fillChains.length,
         outlineLoopCount: fillBlock.outlineLoops?.length ?? 0,
+        overridden: overriddenFillIds.has(fillBlock.id),
         error: fillBlock.error,
       },
       unit.gcodeSegments.length,

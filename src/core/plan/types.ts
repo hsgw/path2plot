@@ -74,6 +74,8 @@ export interface FillListEntry {
   fillChainCount: number
   /** drawOutline=falseやFR-20の形状破綻エラー時は0 */
   outlineLoopCount: number
+  /** このfillに個別上書きが設定済みか(リストの元に戻すアイコン・メニューの「手動」バッジに使う) */
+  overridden: boolean
   error?: FillGeometryError
 }
 

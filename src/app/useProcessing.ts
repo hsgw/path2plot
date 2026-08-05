@@ -16,6 +16,11 @@ const EMPTY_FILL_BLOCKS: FillBlock[] = []
  * 引き起こさないようにする(ファイル読込ごとにWorkerが2回起動する不具合の解消)
  */
 export const EMPTY_JOIN_OVERRIDES: Map<string, boolean> = new Map()
+/** 同上の理由で、塗り個別上書きの空Mapも参照を使い回す */
+export const EMPTY_FILL_OVERRIDES: Map<
+  string,
+  Partial<FillSettings>
+> = new Map()
 
 /** 「どのparseResultに対して計算した結果か」を添えて保持する(ファイル切替直後の不整合を防ぐ) */
 interface ProcessedFor<T> {
@@ -26,6 +31,7 @@ interface ProcessedFor<T> {
 interface UseProcessingArgs {
   parseResult: SvgParseResult | null
   fillSettings: FillSettings
+  fillOverrides: Map<string, Partial<FillSettings>>
   joinDistanceMm: number
   joinOverrides: Map<string, boolean>
 }
@@ -56,6 +62,7 @@ export interface ProcessingState {
 export function useProcessing({
   parseResult,
   fillSettings,
+  fillOverrides,
   joinDistanceMm,
   joinOverrides,
 }: UseProcessingArgs): ProcessingState {
@@ -139,9 +146,10 @@ export function useProcessing({
       requestId,
       fillCandidates: parseResult.fillCandidates,
       fillSettings,
+      fillOverrides,
     }
     worker.postMessage(request)
-  }, [parseResult, fillSettings])
+  }, [parseResult, fillSettings, fillOverrides])
 
   useEffect(() => {
     if (!joinActivated || parseResult === null) return

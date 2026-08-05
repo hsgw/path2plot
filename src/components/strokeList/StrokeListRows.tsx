@@ -246,6 +246,16 @@ const FillRow = memo(function FillRow({
           {entry.outlineLoopCount > 0 ? '輪郭あり' : '輪郭なし'})
           {entry.sourceId ? ` — id="${entry.sourceId}"` : ''}
         </span>
+        {entry.overridden && (
+          <button
+            type="button"
+            className="stroke-list-fill-reset"
+            data-fill-reset-id={entry.id}
+            title="個別設定を元に戻す(グローバル設定を使う)"
+          >
+            ↺
+          </button>
+        )}
         {entry.error && (
           <span className="stroke-list-fill-error" title={entry.error.message}>
             ⚠ 形状破綻
@@ -295,6 +305,7 @@ export const StrokeListRows = memo(function StrokeListRows({
   onHover,
   onSelect,
   onContextMenu,
+  onResetFillOverride,
 }: {
   entries: ListEntry[]
   step: number
@@ -307,6 +318,7 @@ export const StrokeListRows = memo(function StrokeListRows({
     clientX: number,
     clientY: number,
   ) => void
+  onResetFillOverride: (fillId: string) => void
 }) {
   const groups = useMemo(() => groupEntries(entries), [entries])
 
@@ -322,6 +334,16 @@ export const StrokeListRows = memo(function StrokeListRows({
           e.target.closest('.stroke-list-toggle')
         ) {
           return
+        }
+        // 「元に戻す」アイコンの操作は行の選択にせず、個別上書きの解除として扱う
+        if (e.target instanceof Element) {
+          const resetButton = e.target.closest<HTMLElement>(
+            '[data-fill-reset-id]',
+          )
+          if (resetButton) {
+            onResetFillOverride(resetButton.dataset.fillResetId!)
+            return
+          }
         }
         const target = findHighlightTarget(e.target)
         if (target) onSelect(target)

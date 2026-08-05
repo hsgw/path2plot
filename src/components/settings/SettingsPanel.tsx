@@ -24,7 +24,7 @@ interface SettingsPanelProps {
   onResetAll: () => void
   hasEntries: boolean
   fillSettings: FillSettings
-  onFillSettingsChange: (settings: FillSettings) => void
+  onFillSettingsChange: (patch: Partial<FillSettings>) => void
   onFillInvalidChange: (labels: string[]) => void
   canDownloadGcode: boolean
   boundsWarningCount: number

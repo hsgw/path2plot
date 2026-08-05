@@ -7,7 +7,8 @@ import { useInvalidFields } from './useInvalidFields'
 
 interface FillSettingsPanelProps {
   settings: FillSettings
-  onSettingsChange: (settings: FillSettings) => void
+  /** 変更されたフィールドだけを渡す(呼び出し側が現在値へのマージを担う) */
+  onSettingsChange: (patch: Partial<FillSettings>) => void
   onInvalidFieldsChange: (labels: string[]) => void
 }
 
@@ -24,8 +25,7 @@ export function FillSettingsPanel({
     retainOnly(visibleNumberFieldKeys(settings))
   }, [settings, retainOnly])
 
-  const update = (patch: Partial<FillSettings>): void =>
-    onSettingsChange({ ...settings, ...patch })
+  const update = onSettingsChange
 
   const isHatch = settings.pattern === 'hatch'
 

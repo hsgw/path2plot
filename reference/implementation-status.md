@@ -586,6 +586,18 @@ M2                                 ; プログラム終了
 - **トレードオフ**: 上限を超えるなぞりはチェーンを切るため、ハッチ角度と輪郭の辺がほぼ平行になる形状では従来つながっていた長い遠回りが切れる。ただしその遠回りは輪郭上に実線を引く挙動なので、切れる方が紙面の仕上がりとしては素直
 - 追加テスト: 「細い矩形枠でも1本にまとまる」(0/45/90°)、「1回の接続でなぞる距離が上限を超えない」(ハッチ線でない線分の連なりごとに合計長を検証)。計174件
 
+**塗りつぶし設定のfill単位個別上書き(2026-08-05追加)**
+
+- ユーザー要望「各塗りつぶしごとに塗りつぶしの設定を変更できるようにしたい。現在の塗りつぶし設定はグローバル設定とし、個別に設定されていない部分を一括で変更する」への対応。Phase7のペン(レイヤー)概念を待たずに、fill(`FillBlock.id`)単位の個別上書きを追加した
+- **上書きのマージ**: `src/core/fill/overrides.ts`の`resolveEffectiveFillSettings(global, override)`が`{...global, ...override}`でグローバル設定+個別上書き(`Partial<FillSettings>`、変更したフィールドのみ保持)を解決する。未上書きのフィールドは常に最新のグローバル値へ追従する
+- **配線**: `App.tsx`の`fillOverrides: Map<string, Partial<FillSettings>>`(FR-14の`joinOverrides`と同じMap配線パターン)→`useProcessing`→Workerの`FillProcessingRequest.fillOverrides`→`buildFillBlocks(candidates, settings, overrides)`が候補ごとに実効設定を解決してから`buildFillBlock`を呼ぶ。従来`if (!settings.enabled) return []`だった全体早期returnは候補単位の判定に変更し、グローバルOFF中でも個別上書きで`enabled: true`にしたfillだけ生成できるようにした
+- **フォームのpatch化**: `FillSettingsPanel`/`HatchSettingsFields`の`onSettingsChange`の契約を「マージ済み全体」から「変更されたフィールドのpatch」渡しに変更した(呼び出し側がマージを担う)。グローバル設定は`setFillSettings(prev => ({...prev, ...patch}))`、個別編集は`fillOverrides`の該当キーへ`{...prev, ...patch}`でマージする、という対称な実装になる
+- **UI**: `StrokeContextMenu.tsx`にfill行向けメニュー(個別設定を編集…/元に戻す/設定をコピー/設定を貼り付け)を追加。「編集」は新設の`FillOverridePopover.tsx`(既存の`FillSettingsPanel`をそのまま埋め込み)を開く。右クリックメニュー・ポップオーバーの「画面内クランプ+外側クリック/Escape/リサイズ/スクロールで閉じる」処理は共通化し`useFloatingPanelDismiss.ts`に切り出した。「コピー」はそのfillの実効設定を丸ごとクリップボード(`StrokeListPanel`のローカルstate)へ、「貼り付け」はクリップボードの全フィールドを対象fillの上書きとして丸ごと設定する(コピー元の値に完全に固定され、以降はグローバル変更を追従しなくなる)。上書き済みのfill行には`↺`アイコン(`StrokeListRows.tsx`、イベント委譲ハンドラに`[data-fill-reset-id]`分岐を追加)を表示し、クリックで上書きを削除してグローバル設定に戻す
+- リストの`patternLabel`(方式名の短い表記)は従来fill全体で1つの文字列だったが、fillごとに方式が変わりうるため`buildDrawPlan`の引数を`fillPatternLabel: string`から`fillPatternLabels: Map<string,string>`+`overriddenFillIds: Set<string>`に変更した(`App.tsx`側で`parseResult.fillCandidates`と`fillSettings`/`fillOverrides`から`useMemo`で計算)
+- ファイル再読込・「リセット」ボタンで`fillOverrides`もクリアする(`joinOverrides`と同様)
+- 追加テスト: `fillBlock.test.ts`に「個別上書きは対象のfillだけに適用され、他はグローバル設定に従う」「グローバルenabled=falseでも個別上書きでenabled=trueにしたfillは生成される」の2件。`drawPlan.test.ts`/`optimizeOrder.test.ts`は新シグネチャへ追随。計178件(`tsc -b`/`oxlint`とも警告0)
+- ブラウザ確認: `fill-multi-hole`相当のSVG(fill 2件)で、片方だけ個別編集(同心オフセットへ変更→リスト表記が該当行のみ変わる)→元に戻す(↺アイコン・メニュー双方から)→コピー(輪郭線描画をON)→別のfillへ貼り付け→両方に↺アイコンが出て「輪郭あり」表記になることを確認。コピー元は個別編集(spacingMmはグローバル追従のまま)、貼り付け先は丸ごと固定(グローバルのspacingMm変更を追従しない)という設計通りの挙動差も確認。「リセット」で両方とも表示が消えグローバル設定に戻ることを確認。コンソールエラーなし
+
 ---
 
 ## Phase 6: 書き順(手動並び替え・リストUI仕上げ)
