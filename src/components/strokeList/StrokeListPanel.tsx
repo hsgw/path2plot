@@ -1,4 +1,11 @@
-import { memo, useCallback, useEffect, useState } from 'react'
+import {
+  memo,
+  type MouseEvent as ReactMouseEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 import { resolveEffectiveFillSettings } from '../../core/fill/overrides'
 import type { FillSettings } from '../../core/fill/types'
 import type { HighlightSelection, ListEntry } from '../../core/plan/types'
@@ -30,6 +37,10 @@ interface StrokeListPanelProps {
 
 // 参照を使い回し、展開状態リセット時に不要な再レンダを起こさないようにする
 const EMPTY_EXPANDED: ReadonlySet<string> = new Set()
+
+const DEFAULT_PANEL_WIDTH = 280
+const MIN_PANEL_WIDTH = 220
+const MAX_PANEL_WIDTH = 640
 
 /**
  * FR-43: 選択中・メニュー対象の行だけにマッチするCSSルールを組み立てる。
@@ -69,6 +80,9 @@ function StrokeListPanelImpl({
   onSelect,
 }: StrokeListPanelProps) {
   const [isOpen, setIsOpen] = useState(true)
+  const [width, setWidth] = useState(DEFAULT_PANEL_WIDTH)
+  const widthRef = useRef(width)
+  widthRef.current = width
   const [expandedKeys, setExpandedKeys] =
     useState<ReadonlySet<string>>(EMPTY_EXPANDED)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
@@ -145,18 +159,40 @@ function StrokeListPanelImpl({
     [clipboardFillSettings, onPatchFillOverride],
   )
 
+  // パネル幅のドラッグリサイズ。このパネルは右端にあるため、左端ハンドルを左へ
+  // ドラッグするほど幅が広がる(startX - clientXの符号に注意)
+  const handleResizeStart = useCallback((e: ReactMouseEvent): void => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startWidth = widthRef.current
+    const handleMouseMove = (moveEvent: MouseEvent): void => {
+      const next = startWidth + (startX - moveEvent.clientX)
+      setWidth(Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, next)))
+    }
+    const handleMouseUp = (): void => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+  }, [])
+
   const rowRules = buildRowRules(selectedKey, contextMenu?.target.key ?? null)
 
   return (
     <section
       className={`panel panel-stroke-list${isOpen ? '' : ' panel-collapsed'}`}
+      style={isOpen ? { flex: `0 0 ${width}px` } : undefined}
     >
       {rowRules !== '' && <style>{rowRules}</style>}
+      {isOpen && (
+        <div className="panel-resize-handle" onMouseDown={handleResizeStart} />
+      )}
       <div className="panel-header">
         <button type="button" onClick={() => setIsOpen((v) => !v)}>
           {isOpen ? '»' : '«'}
         </button>
-        {isOpen && <h2>ストローク並び順</h2>}
+        {isOpen && <h2>ストローク</h2>}
       </div>
       {isOpen && (
         <div className="panel-body">

@@ -30,6 +30,25 @@
   overflow-y: auto;
 }
 
+.panel-stroke-list {
+  position: relative;
+}
+
+/* ストロークリスト幅のドラッグリサイズ用ハンドル。パネル左端に重ねる */
+.panel-resize-handle {
+  position: absolute;
+  top: 0;
+  left: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 1;
+}
+
+.panel-resize-handle:hover {
+  background: rgba(10, 132, 255, 0.35);
+}
+
 .panel-settings.panel-collapsed,
 .panel-stroke-list.panel-collapsed {
   flex: 0 0 40px;
@@ -439,6 +458,30 @@
 .stroke-list-fill-reset:hover {
   background: rgb(10 132 255 / 22%);
   color: var(--text-h);
+}
+
+/* 形状破綻アイコン(⚠)。文言は持たずtitle属性でメッセージを出す */
+.stroke-list-fill-error {
+  flex-shrink: 0;
+  color: #ff3b30;
+}
+
+/* 個別に上書きされたfill行のハイライト。選択/ホバーの属性セレクタより詳細度が低いため、
+   選択・ホバー時はそちらの色が優先される */
+.stroke-list-item-overridden .stroke-list-label {
+  color: #34c759;
+}
+
+/* fill展開時に上部へ出すパラメータ内訳行(選択・ホバー対象外) */
+.stroke-list-params {
+  color: var(--text);
+  opacity: 0.8;
+  cursor: default;
+}
+
+.stroke-list-swatch-spacer {
+  width: 10px;
+  flex-shrink: 0;
 }
 
 .settings-actions {

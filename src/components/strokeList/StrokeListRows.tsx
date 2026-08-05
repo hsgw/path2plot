@@ -201,6 +201,25 @@ function FillChildRow({
 }
 
 /**
+ * fill行を展開したときにリスト上部に表示する、畳んだ状態では省略されるパラメータ
+ * (パターン・輪郭有無・元のid)の内訳行
+ */
+function FillParamsRow({ entry }: { entry: FillListEntry }) {
+  return (
+    <li className="stroke-list-item stroke-list-params">
+      <span className="stroke-list-toggle-spacer" />
+      <span className="stroke-list-index" />
+      <span className="stroke-list-swatch-spacer" />
+      <span className="stroke-list-label">
+        {entry.patternLabel} ・{' '}
+        {entry.outlineLoopCount > 0 ? '輪郭あり' : '輪郭なし'}
+        {entry.sourceId ? ` ・ id="${entry.sourceId}"` : ''}
+      </span>
+    </li>
+  )
+}
+
+/**
  * FR-22: 塗りブロック(リスト上の表記はfill)の行。FR-23のステップ上は常に1ブロック=1ステップで、
  * 個別ハッチ線は並び替え対象としない。blockと同様、中身(輪郭線・ハッチ線)は既定で畳んでおく。memo化
  */
@@ -222,7 +241,7 @@ const FillRow = memo(function FillRow({
   return (
     <li className="stroke-list-block">
       <div
-        className={`stroke-list-item stroke-list-item-fill stroke-list-item-clickable${pending ? ' stroke-list-item-pending' : ''}`}
+        className={`stroke-list-item stroke-list-item-fill stroke-list-item-clickable${pending ? ' stroke-list-item-pending' : ''}${entry.overridden ? ' stroke-list-item-overridden' : ''}`}
         // FR-43: fill行のハイライトは輪郭線・ハッチ線を含むブロック全体が対象
         data-hl-key={fillRowKey(entry.id)}
         data-hl-index={index}
@@ -242,9 +261,7 @@ const FillRow = memo(function FillRow({
           style={{ backgroundColor: entry.color }}
         />
         <span className="stroke-list-label">
-          🖌 fill({entry.patternLabel} {entry.fillChainCount}本,{' '}
-          {entry.outlineLoopCount > 0 ? '輪郭あり' : '輪郭なし'})
-          {entry.sourceId ? ` — id="${entry.sourceId}"` : ''}
+          fill({entry.patternLabel}・{entry.fillChainCount}本)
         </span>
         {entry.overridden && (
           <button
@@ -258,12 +275,13 @@ const FillRow = memo(function FillRow({
         )}
         {entry.error && (
           <span className="stroke-list-fill-error" title={entry.error.message}>
-            ⚠ 形状破綻
+            ⚠
           </span>
         )}
       </div>
       {expanded && childCount > 0 && (
         <ol className="stroke-list stroke-list-children">
+          <FillParamsRow entry={entry} />
           {Array.from({ length: entry.outlineLoopCount }, (_, i) => (
             <FillChildRow
               key={`outline-${i}`}
