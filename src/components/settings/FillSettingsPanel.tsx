@@ -28,19 +28,37 @@ export function FillSettingsPanel({
   const update = onSettingsChange
 
   const isHatch = settings.pattern === 'hatch'
+  const isOffset = settings.pattern === 'offset'
 
   return (
     <div className="settings-group">
       <h3>塗りつぶし設定(FR-17〜21)</h3>
-      <label className="settings-checkbox-label">
-        <input
-          type="checkbox"
-          checked={settings.enabled}
-          onChange={(e) => update({ enabled: e.target.checked })}
-        />
-        塗りつぶし処理を有効にする
+      <NumberField
+        label="塗りオフセット(mm)"
+        value={settings.fillOffsetMm}
+        step={0.1}
+        onCommit={(fillOffsetMm) => update({ fillOffsetMm })}
+        onValidityChange={(valid) =>
+          setValidity('fillOffsetMm', '塗りオフセット', valid)
+        }
+      />
+      <p className="settings-hint">
+        ペン(レイヤー)概念導入(Phase7)前は、全ての塗りブロックに共通の設定として適用されます。
+        線幅入力欄はPhase7まで存在しないため、線間隔・塗りオフセットの既定値算出(FR-19/FR-20)は
+        フォールバック値基準で、線の重ね量はまだ効果を持ちません
+      </p>
+      <label>
+        塗りつぶし方式
+        <select
+          value={settings.pattern}
+          onChange={(e) => update({ pattern: e.target.value as FillPattern })}
+        >
+          <option value="none">塗りつぶしなし</option>
+          <option value="hatch">ハッチ</option>
+          <option value="offset">オフセット</option>
+        </select>
       </label>
-      {settings.enabled && (
+      {settings.pattern !== 'none' && (
         <>
           {isHatch ? (
             <label className="settings-checkbox-label">
@@ -53,37 +71,10 @@ export function FillSettingsPanel({
             </label>
           ) : (
             <p className="settings-hint">
-              同心オフセット・スパイラルは最も外側のリングが輪郭そのものになるため、
+              オフセット方式(同心・スパイラルとも)は最も外側のリングが輪郭そのものになるため、
               輪郭線(FR-21)は二重描画を避けて別途描きません
             </p>
           )}
-          <NumberField
-            label="塗りオフセット(mm)"
-            value={settings.fillOffsetMm}
-            step={0.1}
-            onCommit={(fillOffsetMm) => update({ fillOffsetMm })}
-            onValidityChange={(valid) =>
-              setValidity('fillOffsetMm', '塗りオフセット', valid)
-            }
-          />
-          <p className="settings-hint">
-            ペン(レイヤー)概念導入(Phase7)前は、全ての塗りブロックに共通の設定として適用されます。
-            線幅入力欄はPhase7まで存在しないため、線間隔・塗りオフセットの既定値算出(FR-19/FR-20)は
-            フォールバック値基準で、線の重ね量はまだ効果を持ちません
-          </p>
-          <label>
-            塗りつぶし方式
-            <select
-              value={settings.pattern}
-              onChange={(e) =>
-                update({ pattern: e.target.value as FillPattern })
-              }
-            >
-              <option value="hatch">ハッチ</option>
-              <option value="concentric">同心オフセット</option>
-              <option value="spiral">スパイラル</option>
-            </select>
-          </label>
 
           {isHatch && (
             <NumberField
@@ -106,6 +97,16 @@ export function FillSettingsPanel({
               setValidity('spacingMm', '線間隔', valid)
             }
           />
+          {isOffset && (
+            <label className="settings-checkbox-label">
+              <input
+                type="checkbox"
+                checked={settings.offsetSpiralMode}
+                onChange={(e) => update({ offsetSpiralMode: e.target.checked })}
+              />
+              スパイラルモード(同心リングを1本につなぐ)
+            </label>
+          )}
 
           {isHatch && (
             <HatchSettingsFields

@@ -147,10 +147,10 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
     expect(Math.max(...xs)).toBeGreaterThan(30)
   })
 
-  it('enabled=falseの場合は塗りブロックを一切生成しない', () => {
+  it("pattern='none'の場合は塗りブロックを一切生成しない", () => {
     const blocks = build([candidate([SQUARE_10])], {
       ...DEFAULT_FILL_SETTINGS,
-      enabled: false,
+      pattern: 'none',
     })
     expect(blocks).toEqual([])
   })
@@ -204,10 +204,11 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
     expect(cross.fillChains.length).toBe(20)
   })
 
-  it('同心オフセットはリング群を生成し、輪郭線は二重描画を避けて生成しない', () => {
+  it('オフセット(同心)はリング群を生成し、輪郭線は二重描画を避けて生成しない', () => {
     const [block] = build([candidate([SQUARE_10])], {
       ...DEFAULT_FILL_SETTINGS,
-      pattern: 'concentric',
+      pattern: 'offset',
+      offsetSpiralMode: false,
       fillOffsetMm: 0,
       spacingMm: 1,
       drawOutline: true,
@@ -220,10 +221,11 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
     }
   })
 
-  it('スパイラルは同心リングを1本につないだチェーンになる', () => {
+  it('オフセット(スパイラルモード)は同心リングを1本につないだチェーンになる', () => {
     const [block] = build([candidate([SQUARE_10])], {
       ...DEFAULT_FILL_SETTINGS,
-      pattern: 'spiral',
+      pattern: 'offset',
+      offsetSpiralMode: true,
       fillOffsetMm: 0,
       spacingMm: 1,
     })
@@ -308,16 +310,16 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
     expect(filtered.fillChains).toEqual([])
   })
 
-  it('グローバルenabled=falseでも、個別上書きでenabled=trueにしたfillは生成される', () => {
+  it("グローバルpattern='none'でも、個別上書きでpatternを'none'以外にしたfillは生成される", () => {
     const overrides = new Map<string, Partial<FillSettings>>([
-      ['fill-0', { enabled: true }],
+      ['fill-0', { pattern: 'hatch' }],
     ])
     const blocks = buildFillBlocks(
       [
         candidate([SQUARE_10], { id: 'fill-0' }),
         candidate([SQUARE_10], { id: 'fill-1' }),
       ],
-      { ...DEFAULT_FILL_SETTINGS, enabled: false },
+      { ...DEFAULT_FILL_SETTINGS, pattern: 'none' },
       overrides,
     )
     expect(blocks.map((b) => b.id)).toEqual(['fill-0'])

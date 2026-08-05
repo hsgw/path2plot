@@ -6,8 +6,10 @@ import type { FillSettings } from '../../core/fill/types'
  * G-codeダウンロードが解除されなくなるのを防ぐ。
  */
 export function visibleNumberFieldKeys(settings: FillSettings): Set<string> {
-  if (!settings.enabled) return new Set()
-  const keys = ['spacingMm', 'fillOffsetMm']
+  // 塗りオフセットは方式によらず常に表示する
+  const keys = ['fillOffsetMm']
+  if (settings.pattern === 'none') return new Set(keys)
+  keys.push('spacingMm')
   if (settings.pattern === 'hatch') {
     keys.push('angleDeg', 'minHatchLineLengthMm')
     if (settings.crossHatch) keys.push('crossAngleDeg')

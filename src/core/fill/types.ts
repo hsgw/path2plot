@@ -11,12 +11,13 @@ export interface FillCandidate {
 }
 
 /**
- * FR-17: 塗りつぶし方式。
- * 'hatch'      … 平行線ハッチ(クロスハッチ・波形・連結モードは下記の各設定で切り替える)
- * 'concentric' … 輪郭を線間隔ずつ内側へオフセットした同心リング群
- * 'spiral'     … 同心リングを1本につないだ簡易スパイラル
+ * FR-17: 塗りつぶし方式。有効化のON/OFFもここに含む('none'が無効)。
+ * 'none'   … 塗りつぶし処理を行わない
+ * 'hatch'  … 平行線ハッチ(クロスハッチ・波形・連結モードは下記の各設定で切り替える)
+ * 'offset' … 輪郭を線間隔ずつ内側へオフセットした同心リング群。offsetSpiralModeで
+ *            リング群のまま(同心)か、1本につないだスパイラルにするかを切り替える
  */
-export type FillPattern = 'hatch' | 'concentric' | 'spiral'
+export type FillPattern = 'none' | 'hatch' | 'offset'
 
 /** ハッチ1行の線の形状。connect==='zigzag'では行の端点しか使わないため結果に現れない */
 export type HatchWaveform = 'straight' | 'sine' | 'triangle'
@@ -40,9 +41,12 @@ export type HatchConnectMode = 'none' | 'zigzag' | 'boustrophedon'
  * Phase7でペンごとの「コピー方式」へ移す際に型の再設計が要らないようにするため。
  */
 export interface FillSettings {
-  /** falseの場合、fill付き閉パスがあっても塗りブロック(輪郭線・塗り線とも)を一切生成しない */
-  enabled: boolean
+  /** pattern==='none'の場合、fill付き閉パスがあっても塗りブロック(輪郭線・塗り線とも)を一切生成しない */
   pattern: FillPattern
+
+  // --- offset ---
+  /** trueの場合、同心リング群ではなく1本につないだスパイラルにする(pattern==='offset'でのみ使用) */
+  offsetSpiralMode: boolean
 
   // --- hatch 共通 ---
   angleDeg: number
@@ -96,8 +100,8 @@ export interface FillSettings {
 }
 
 export const DEFAULT_FILL_SETTINGS: FillSettings = {
-  enabled: true,
   pattern: 'hatch',
+  offsetSpiralMode: true,
   angleDeg: 45,
   spacingMm: 0.5,
   crossHatch: false,

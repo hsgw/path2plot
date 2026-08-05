@@ -74,10 +74,10 @@ function buildHatchChains(
 
 function buildChains(region: Point[][], settings: FillSettings): Point[][] {
   switch (settings.pattern) {
-    case 'concentric':
-      return generateConcentricRings(region, settings.spacingMm)
-    case 'spiral':
-      return generateSpiralPath(region, settings.spacingMm)
+    case 'offset':
+      return settings.offsetSpiralMode
+        ? generateSpiralPath(region, settings.spacingMm)
+        : generateConcentricRings(region, settings.spacingMm)
     default: {
       // クロスハッチは方向ごとに独立して連結する(方向をまたいだ連結はしない)
       const angles = settings.crossHatch
@@ -94,7 +94,7 @@ function buildChains(region: Point[][], settings: FillSettings): Point[][] {
  * FR-16〜FR-21: fill候補1つを、輪郭解決→オフセット→塗り線生成→輪郭線という一連の処理にかけ、
  * 1つの塗りブロック(FR-22)にまとめる。
  *
- * 同心オフセット・スパイラルは最も外側のリングが輪郭そのものなので、FR-21の輪郭線は
+ * オフセット方式(同心・スパイラルとも)は最も外側のリングが輪郭そのものなので、FR-21の輪郭線は
  * 二重描画になるため生成しない(UI側でも輪郭線の設定を出さない)。
  */
 function buildFillBlock(
@@ -103,8 +103,7 @@ function buildFillBlock(
 ): FillBlock {
   const resolved = resolveFillPolygon(candidate)
   const offsetResult = offsetPolygon(resolved, settings.fillOffsetMm)
-  const outlineIsRedundant =
-    settings.pattern === 'concentric' || settings.pattern === 'spiral'
+  const outlineIsRedundant = settings.pattern === 'offset'
   const outlineLoops =
     settings.drawOutline && !outlineIsRedundant ? resolved.map(closeLoop) : null
 
@@ -137,8 +136,8 @@ function buildFillBlock(
 }
 
 /**
- * fillごとの個別上書きを解決してから塗りブロックを生成する。グローバルのenabled=falseでも
- * 個別上書きでenabled=trueにしたcandidateはそのfillだけ生成する
+ * fillごとの個別上書きを解決してから塗りブロックを生成する。グローバルのpattern='none'でも
+ * 個別上書きでpatternを'none'以外にしたcandidateはそのfillだけ生成する
  */
 export function buildFillBlocks(
   candidates: FillCandidate[],
@@ -150,7 +149,7 @@ export function buildFillBlocks(
       settings,
       overrides.get(candidate.id),
     )
-    if (!effective.enabled) return []
+    if (effective.pattern === 'none') return []
     return [buildFillBlock(candidate, effective)]
   })
 }
