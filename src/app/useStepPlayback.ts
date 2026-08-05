@@ -34,6 +34,7 @@ export function useStepPlayback({
   const [step, setStepState] = useState(0)
   const [playing, setPlaying] = useState(false)
   const pendingFullRevealRef = useRef(false)
+  const prevTotalStepsRef = useRef(totalSteps)
 
   useEffect(() => {
     pendingFullRevealRef.current = true
@@ -44,11 +45,15 @@ export function useStepPlayback({
     if (isProcessing) return
     if (pendingFullRevealRef.current) {
       pendingFullRevealRef.current = false
+      prevTotalStepsRef.current = totalSteps
       setStepState(totalSteps)
       return
     }
-    // 設定変更で件数が変わった場合は範囲内にクランプするのみで、ステップ位置自体は極力保持する
-    setStepState((s) => Math.min(s, totalSteps))
+    // ステップの最大値が変化した場合は常に最大ステップを表示する
+    if (totalSteps !== prevTotalStepsRef.current) {
+      prevTotalStepsRef.current = totalSteps
+      setStepState(totalSteps)
+    }
   }, [isProcessing, totalSteps, revealKey])
 
   useEffect(() => {
