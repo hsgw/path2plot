@@ -82,13 +82,17 @@ function buildFillBlock(
 ): FillBlock {
   const resolved = resolveFillPolygon(candidate)
   const offsetResult = offsetPolygon(resolved, settings.fillOffsetMm)
+  const outlineIsRedundant =
+    settings.pattern === 'concentric' || settings.pattern === 'spiral'
+  const outlineLoops =
+    settings.drawOutline && !outlineIsRedundant ? resolved.map(closeLoop) : null
 
   if ('error' in offsetResult) {
     return {
       id: candidate.id,
       sourceId: candidate.sourceId,
       color: candidate.fillColor,
-      outlineLoops: null,
+      outlineLoops,
       fillChains: [],
       error: {
         fillBlockId: candidate.id,
@@ -101,10 +105,6 @@ function buildFillBlock(
 
   const region = offsetResult.paths
   const fillChains = buildChains(region, settings)
-  const outlineIsRedundant =
-    settings.pattern === 'concentric' || settings.pattern === 'spiral'
-  const outlineLoops =
-    settings.drawOutline && !outlineIsRedundant ? resolved.map(closeLoop) : null
 
   return {
     id: candidate.id,

@@ -75,7 +75,35 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
     expect(Math.max(...ys)).toBeCloseTo(10)
   })
 
-  it('塗りオフセットで形状が崩壊する場合はエラーになりハッチ・輪郭とも空になる', () => {
+  it('塗りオフセットで形状が崩壊する場合はエラーになりハッチは空になるが、輪郭線はオフセット前の元輪郭で描かれる', () => {
+    const thin: Point[] = [
+      { x: 5, y: 4.5 },
+      { x: 55, y: 4.5 },
+      { x: 55, y: 5.5 },
+      { x: 5, y: 5.5 },
+    ]
+    const [block] = build([candidate([thin])], {
+      ...DEFAULT_FILL_SETTINGS,
+      fillOffsetMm: 0.6,
+      drawOutline: true,
+    })
+    expect(block.error).toEqual({
+      fillBlockId: 'fill-0',
+      sourceId: undefined,
+      kind: 'collapsed',
+      message: expect.any(String),
+    })
+    expect(block.fillChains).toEqual([])
+    expect(block.outlineLoops).not.toBeNull()
+    const loop = block.outlineLoops![0]
+    expect(loop[0]).toEqual(loop.at(-1))
+    expect(loop).toHaveLength(thin.length + 1)
+    for (const p of thin) {
+      expect(loop).toContainEqual(expect.objectContaining({ x: p.x, y: p.y }))
+    }
+  })
+
+  it('塗りオフセットで形状が崩壊してもdrawOutline=falseなら輪郭線は生成されない', () => {
     const thin: Point[] = [
       { x: 5, y: 4.5 },
       { x: 55, y: 4.5 },
@@ -86,13 +114,7 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
       ...DEFAULT_FILL_SETTINGS,
       fillOffsetMm: 0.6,
     })
-    expect(block.error).toEqual({
-      fillBlockId: 'fill-0',
-      sourceId: undefined,
-      kind: 'collapsed',
-      message: expect.any(String),
-    })
-    expect(block.fillChains).toEqual([])
+    expect(block.error).toBeDefined()
     expect(block.outlineLoops).toBeNull()
   })
 
