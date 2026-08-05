@@ -33,6 +33,14 @@ export function FillSettingsPanel({
   return (
     <div className="settings-group">
       <h3>塗りつぶし設定(FR-17〜21)</h3>
+      <label className="settings-checkbox-label">
+        <input
+          type="checkbox"
+          checked={settings.drawOutline}
+          onChange={(e) => update({ drawOutline: e.target.checked })}
+        />
+        輪郭線を描く(FR-21)
+      </label>
       <NumberField
         label="塗りオフセット(mm)"
         value={settings.fillOffsetMm}
@@ -60,22 +68,6 @@ export function FillSettingsPanel({
       </label>
       {settings.pattern !== 'none' && (
         <>
-          {isHatch ? (
-            <label className="settings-checkbox-label">
-              <input
-                type="checkbox"
-                checked={settings.drawOutline}
-                onChange={(e) => update({ drawOutline: e.target.checked })}
-              />
-              輪郭線を描く(FR-21)
-            </label>
-          ) : (
-            <p className="settings-hint">
-              オフセット方式(同心・スパイラルとも)は最も外側のリングが輪郭そのものになるため、
-              輪郭線(FR-21)は二重描画を避けて別途描きません
-            </p>
-          )}
-
           {isHatch && (
             <NumberField
               label="ハッチ角度(度)"

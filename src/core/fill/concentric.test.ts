@@ -89,4 +89,16 @@ describe('generateConcentricRings(FR-17: 同心オフセット)', () => {
     expect(generateConcentricRings([SQUARE_10], 0)).toEqual([])
     expect(generateConcentricRings([], 1)).toEqual([])
   })
+
+  it('skipOutlineRing=trueなら最も外側のリング(level 0)を除外する', () => {
+    const rings = generateConcentricRings([SQUARE_10], 1)
+    const skipped = generateConcentricRings([SQUARE_10], 1, true)
+    expect(skipped.length).toBe(rings.length - 1)
+    const width = (ring: Point[]): number => {
+      const xs = ring.map((p) => p.x)
+      return Math.max(...xs) - Math.min(...xs)
+    }
+    // level 0(幅10)が除外され、level 1(幅8)から始まる
+    expect(width(skipped[0])).toBeCloseTo(8, 1)
+  })
 })

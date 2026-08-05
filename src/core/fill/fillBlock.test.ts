@@ -37,7 +37,7 @@ const SQUARE_10: Point[] = [
 ]
 
 describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケストレーション)', () => {
-  it('既定では輪郭線を描かず、ハッチ線だけの塗りブロックになる', () => {
+  it('既定では輪郭線を描き、ハッチ線の塗りブロックになる', () => {
     const [block] = build([candidate([SQUARE_10])], {
       ...DEFAULT_FILL_SETTINGS,
       fillOffsetMm: 0,
@@ -45,7 +45,7 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
     expect(block.error).toBeUndefined()
     expect(block.color).toBe('#123456')
     expect(block.fillChains.length).toBeGreaterThan(0)
-    expect(block.outlineLoops).toBeNull()
+    expect(block.outlineLoops).not.toBeNull()
   })
 
   it('drawOutline=trueの場合は閉じた輪郭ループが加わる', () => {
@@ -113,6 +113,7 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
     const [block] = build([candidate([thin])], {
       ...DEFAULT_FILL_SETTINGS,
       fillOffsetMm: 0.6,
+      drawOutline: false,
     })
     expect(block.error).toBeDefined()
     expect(block.outlineLoops).toBeNull()
@@ -147,10 +148,11 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
     expect(Math.max(...xs)).toBeGreaterThan(30)
   })
 
-  it("pattern='none'の場合は塗りブロックを一切生成しない", () => {
+  it("pattern='none'かつdrawOutline=falseの場合は塗りブロックを一切生成しない", () => {
     const blocks = build([candidate([SQUARE_10])], {
       ...DEFAULT_FILL_SETTINGS,
       pattern: 'none',
+      drawOutline: false,
     })
     expect(blocks).toEqual([])
   })
@@ -204,14 +206,14 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
     expect(cross.fillChains.length).toBe(20)
   })
 
-  it('オフセット(同心)はリング群を生成し、輪郭線は二重描画を避けて生成しない', () => {
+  it('オフセット(同心)はdrawOutline=falseなら輪郭線を描かずリング群(level 0含む)を生成する', () => {
     const [block] = build([candidate([SQUARE_10])], {
       ...DEFAULT_FILL_SETTINGS,
       pattern: 'offset',
       offsetSpiralMode: false,
       fillOffsetMm: 0,
       spacingMm: 1,
-      drawOutline: true,
+      drawOutline: false,
     })
     expect(block.outlineLoops).toBeNull()
     // 10x10の正方形を1mmずつ内側へ掘ると5リング(最後は幅0で消える)
@@ -221,6 +223,34 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
     }
   })
 
+  it('オフセット(同心)はdrawOutline=trueなら輪郭線を描き、最も外側のリング(level 0)は二重描画を避けて生成しない', () => {
+    const [block] = build([candidate([SQUARE_10])], {
+      ...DEFAULT_FILL_SETTINGS,
+      pattern: 'offset',
+      offsetSpiralMode: false,
+      fillOffsetMm: 0,
+      spacingMm: 1,
+      drawOutline: true,
+    })
+    expect(block.outlineLoops).not.toBeNull()
+    // level 0(元の輪郭)を輪郭線側で描くため、塗り線側は残り4リングだけになる
+    expect(block.fillChains.length).toBe(4)
+    for (const ring of block.fillChains) {
+      expect(ring[0]).toEqual(ring.at(-1))
+    }
+  })
+
+  it("pattern='none'でもdrawOutline=trueなら輪郭線だけの塗りブロックを生成する", () => {
+    const [block] = build([candidate([SQUARE_10])], {
+      ...DEFAULT_FILL_SETTINGS,
+      pattern: 'none',
+      drawOutline: true,
+    })
+    expect(block.outlineLoops).not.toBeNull()
+    expect(block.fillChains).toEqual([])
+    expect(block.error).toBeUndefined()
+  })
+
   it('オフセット(スパイラルモード)は同心リングを1本につないだチェーンになる', () => {
     const [block] = build([candidate([SQUARE_10])], {
       ...DEFAULT_FILL_SETTINGS,
@@ -228,6 +258,7 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
       offsetSpiralMode: true,
       fillOffsetMm: 0,
       spacingMm: 1,
+      drawOutline: false,
     })
     expect(block.outlineLoops).toBeNull()
     expect(block.fillChains.length).toBe(1)
@@ -319,7 +350,7 @@ describe('buildFillBlocks(FR-16〜21: 塗りブロック生成のオーケスト
         candidate([SQUARE_10], { id: 'fill-0' }),
         candidate([SQUARE_10], { id: 'fill-1' }),
       ],
-      { ...DEFAULT_FILL_SETTINGS, pattern: 'none' },
+      { ...DEFAULT_FILL_SETTINGS, pattern: 'none', drawOutline: false },
       overrides,
     )
     expect(blocks.map((b) => b.id)).toEqual(['fill-0'])

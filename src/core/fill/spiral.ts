@@ -27,8 +27,14 @@ function rotateAndClose(contour: Point[], startIdx: number): Point[] {
 export function generateSpiralPath(
   offsetPaths: Point[][],
   spacingMm: number,
+  skipOutlineRing = false,
 ): Point[][] {
-  const rings = collectRingContours(offsetPaths, spacingMm, MAX_SPIRAL_RINGS)
+  const rings = collectRingContours(
+    offsetPaths,
+    spacingMm,
+    MAX_SPIRAL_RINGS,
+    skipOutlineRing,
+  )
   if (rings.length === 0) return []
 
   const remaining = rings.map((_, i) => i)

@@ -12,10 +12,13 @@ export interface FillCandidate {
 
 /**
  * FR-17: 塗りつぶし方式。有効化のON/OFFもここに含む('none'が無効)。
- * 'none'   … 塗りつぶし処理を行わない
+ * 'none'   … 塗り線を生成しない。ただしdrawOutline=trueなら輪郭線だけは別途生成する
+ *            (輪郭線描画はpatternと独立した機能のため)
  * 'hatch'  … 平行線ハッチ(クロスハッチ・波形・連結モードは下記の各設定で切り替える)
  * 'offset' … 輪郭を線間隔ずつ内側へオフセットした同心リング群。offsetSpiralModeで
- *            リング群のまま(同心)か、1本につないだスパイラルにするかを切り替える
+ *            リング群のまま(同心)か、1本につないだスパイラルにするかを切り替える。
+ *            drawOutline=trueのときは最も外側のリング(輪郭そのもの)が輪郭線と重複するため
+ *            間引く
  */
 export type FillPattern = 'none' | 'hatch' | 'offset'
 
@@ -41,7 +44,10 @@ export type HatchConnectMode = 'none' | 'zigzag' | 'boustrophedon'
  * Phase7でペンごとの「コピー方式」へ移す際に型の再設計が要らないようにするため。
  */
 export interface FillSettings {
-  /** pattern==='none'の場合、fill付き閉パスがあっても塗りブロック(輪郭線・塗り線とも)を一切生成しない */
+  /**
+   * pattern==='none'の場合、塗り線は生成しない。drawOutline=trueならその場合でも
+   * 輪郭線のみの塗りブロックを生成する(輪郭線描画はpatternと独立した機能のため)
+   */
   pattern: FillPattern
 
   // --- offset ---
@@ -111,11 +117,11 @@ export const DEFAULT_FILL_SETTINGS: FillSettings = {
   waveLengthMm: 2,
   waveSegmentsPerCycle: 8,
   minHatchLineLengthMm: 0,
-  connect: 'none',
+  connect: 'boustrophedon',
   connectDistanceFactor: 3,
   overlapPercent: 0,
   fillOffsetMm: 0,
-  drawOutline: false,
+  drawOutline: true,
 }
 
 /** FR-20: 塗りオフセットがClipperの返り値から形状破綻(面積0以下への崩壊)と判定された場合のエラー */

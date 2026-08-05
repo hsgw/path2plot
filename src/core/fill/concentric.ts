@@ -23,6 +23,7 @@ export function collectRingContours(
   offsetPaths: Point[][],
   spacingMm: number,
   maxRings = MAX_RINGS,
+  skipOutlineRing = false,
 ): RingContour[] {
   if (offsetPaths.length === 0 || spacingMm <= 0) return []
 
@@ -32,7 +33,9 @@ export function collectRingContours(
   const limit = Math.min(maxRings, Math.ceil(diagonal / spacingMm) + 1)
 
   const rings: RingContour[] = []
-  for (let level = 0; level < limit; level++) {
+  // skipOutlineRingが true のとき level 0(=元の輪郭そのもの)は輪郭線側で
+  // 別途描かれるため、二重描画を避けてここでは生成しない
+  for (let level = skipOutlineRing ? 1 : 0; level < limit; level++) {
     const paths =
       level === 0
         ? offsetPaths
@@ -53,13 +56,17 @@ export function collectRingContours(
 /**
  * FR-17(同心オフセット): 塗り領域の輪郭を線間隔ずつ内側へオフセットしたリング群で塗る。
  * 各リングは閉ループ(始点=終点)として返す。level 0 は元の輪郭そのものなので、
- * このパターンでは輪郭線(FR-21)を別途描く必要はない。
+ * 輪郭線(FR-21)を別途描く場合は skipOutlineRing=true を渡して二重描画を避ける。
  */
 export function generateConcentricRings(
   offsetPaths: Point[][],
   spacingMm: number,
+  skipOutlineRing = false,
 ): Point[][] {
-  return collectRingContours(offsetPaths, spacingMm).map((r) =>
-    closeLoop(r.contour),
-  )
+  return collectRingContours(
+    offsetPaths,
+    spacingMm,
+    MAX_RINGS,
+    skipOutlineRing,
+  ).map((r) => closeLoop(r.contour))
 }

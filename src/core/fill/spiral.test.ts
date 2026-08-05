@@ -96,4 +96,12 @@ describe('generateSpiralPath(FR-17: スパイラル)', () => {
     expect(generateSpiralPath([SQUARE_20], 0)).toEqual([])
     expect(generateSpiralPath([], 2)).toEqual([])
   })
+
+  it('skipOutlineRing=trueなら最も外側のリング(level 0)を除いた1つ内側から始まる', () => {
+    const distanceToCenter = (p: Point): number =>
+      Math.max(Math.abs(p.x - 10), Math.abs(p.y - 10))
+    const [chain] = generateSpiralPath([SQUARE_20], 2, true)
+    // level 0(外周、中心からの距離10)は除外され、level 1(距離8)から始まる
+    expect(distanceToCenter(chain[0])).toBeCloseTo(8, 1)
+  })
 })

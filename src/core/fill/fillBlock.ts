@@ -76,8 +76,12 @@ function buildChains(region: Point[][], settings: FillSettings): Point[][] {
   switch (settings.pattern) {
     case 'offset':
       return settings.offsetSpiralMode
-        ? generateSpiralPath(region, settings.spacingMm)
-        : generateConcentricRings(region, settings.spacingMm)
+        ? generateSpiralPath(region, settings.spacingMm, settings.drawOutline)
+        : generateConcentricRings(
+            region,
+            settings.spacingMm,
+            settings.drawOutline,
+          )
     default: {
       // クロスハッチは方向ごとに独立して連結する(方向をまたいだ連結はしない)
       const angles = settings.crossHatch
@@ -94,18 +98,31 @@ function buildChains(region: Point[][], settings: FillSettings): Point[][] {
  * FR-16〜FR-21: fill候補1つを、輪郭解決→オフセット→塗り線生成→輪郭線という一連の処理にかけ、
  * 1つの塗りブロック(FR-22)にまとめる。
  *
- * オフセット方式(同心・スパイラルとも)は最も外側のリングが輪郭そのものなので、FR-21の輪郭線は
- * 二重描画になるため生成しない(UI側でも輪郭線の設定を出さない)。
+ * 輪郭線描画(FR-21)はpatternの有効/無効と独立した機能であり、patternに関わらず
+ * drawOutline設定だけに従う。ただしオフセット方式(同心・スパイラルとも)は最も外側のリングが
+ * 輪郭そのものなので、drawOutline=trueのときは二重描画を避けてそのリングを生成しない
+ * (buildChains参照)。
  */
 function buildFillBlock(
   candidate: FillCandidate,
   settings: FillSettings,
 ): FillBlock {
   const resolved = resolveFillPolygon(candidate)
+  const outlineLoops = settings.drawOutline ? resolved.map(closeLoop) : null
+
+  // pattern==='none'は塗り線を生成しないため、オフセット処理自体を行わずに済ませる
+  // (塗り線を作らなければオフセットの形状破綻エラーも起こり得ない)
+  if (settings.pattern === 'none') {
+    return {
+      id: candidate.id,
+      sourceId: candidate.sourceId,
+      color: candidate.fillColor,
+      outlineLoops,
+      fillChains: [],
+    }
+  }
+
   const offsetResult = offsetPolygon(resolved, settings.fillOffsetMm)
-  const outlineIsRedundant = settings.pattern === 'offset'
-  const outlineLoops =
-    settings.drawOutline && !outlineIsRedundant ? resolved.map(closeLoop) : null
 
   if ('error' in offsetResult) {
     return {
@@ -149,7 +166,7 @@ export function buildFillBlocks(
       settings,
       overrides.get(candidate.id),
     )
-    if (effective.pattern === 'none') return []
+    if (effective.pattern === 'none' && !effective.drawOutline) return []
     return [buildFillBlock(candidate, effective)]
   })
 }
