@@ -335,6 +335,12 @@
   text-align: right;
 }
 
+.preview-toggle-active {
+  background: var(--highlight-selected-bar, #0a84ff);
+  color: #fff;
+  border-color: var(--highlight-selected-bar, #0a84ff);
+}
+
 .stroke-list {
   list-style: none;
   margin: 0;
@@ -361,6 +367,8 @@
 .stroke-list {
   --highlight-selected-bg: rgba(10, 132, 255, 0.22);
   --highlight-selected-bar: #0a84ff;
+  --highlight-hover-bg: rgba(255, 149, 0, 0.22);
+  --highlight-hover-bar: #ff9500;
 }
 
 .stroke-list-item-clickable {

@@ -1,14 +1,11 @@
 import type { HighlightSelection } from '../../core/plan/types'
 
-/**
- * FR-43のハイライト行キー。行の種別ごとに接頭辞を付け、同じidを持つ行
- * (block行とその先頭ストローク行など)が衝突しないようにする
- */
-export const strokeRowKey = (id: string): string => `stroke:${id}`
-export const blockRowKey = (id: string): string => `block:${id}`
-export const fillRowKey = (id: string): string => `fill:${id}`
-export const fillChildRowKey = (id: string, segmentOffset: number): string =>
-  `fillchild:${id}:${segmentOffset}`
+export {
+  blockRowKey,
+  fillChildRowKey,
+  fillRowKey,
+  strokeRowKey,
+} from '../../core/plan/highlight'
 
 /**
  * FR-43: イベント委譲で、ホバー/クリック/右クリックされた位置から対象行のハイライト情報を読み取る。

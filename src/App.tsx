@@ -267,6 +267,8 @@ function App() {
           visibleSegmentCount={visibleSegmentCount}
           hoverHighlight={highlight.hoverHighlight}
           selectedHighlight={highlight.selectedHighlight}
+          onSegmentHover={highlight.onSegmentHover}
+          onSegmentSelect={highlight.onSegmentSelect}
           bedWidthMm={gcodeSettings.bedWidthMm}
           bedHeightMm={gcodeSettings.bedHeightMm}
           step={playback.step}
@@ -285,6 +287,7 @@ function App() {
           onPatchFillOverride={handlePatchFillOverride}
           onResetFillOverride={handleResetFillOverride}
           selectedKey={highlight.selectedKey}
+          previewHoverKey={highlight.hoverKey}
           onHover={highlight.onHover}
           onSelect={highlight.onSelect}
         />

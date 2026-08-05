@@ -65,6 +65,14 @@ export function createProjector(view: View): Projector {
   }
 }
 
+/** FR-43(プレビュー→リスト方向): createProjectorの逆写像。画面座標(px)→mm座標 */
+export function screenToMm(view: View, xPx: number, yPx: number): Point {
+  return {
+    x: (xPx - view.offsetX) / view.scale,
+    y: (view.height - view.offsetY - yPx) / view.scale,
+  }
+}
+
 /** Canvasの実ピクセル数をdprに合わせて設定し、論理px単位で描けるようにする(内容はクリアされる) */
 export function resetCanvas(
   canvas: HTMLCanvasElement,

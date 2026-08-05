@@ -8,10 +8,12 @@ const PEN_LIFT_COLOR = '#e04949'
 
 export const GHOST_ALPHA = 0.2
 export const BED_FILL_COLOR = '#ffffff'
+export const STROKE_LINE_WIDTH_PX = 1.5
 // FR-43: ホバーと選択(クリック)で色を変え、どちらの操作による強調かを区別できるようにする
 export const HOVER_HIGHLIGHT_COLOR = '#ff9500'
 export const SELECTED_HIGHLIGHT_COLOR = '#0a84ff'
-export const HIGHLIGHT_LINE_WIDTH = 3.5
+// 実線と同じ太さで上書きするだけにし、線が太くなったように見えないようにする
+export const HIGHLIGHT_LINE_WIDTH = STROKE_LINE_WIDTH_PX
 
 /** FR-24: 開始点の◯表示 */
 function drawStartMarker(ctx: CanvasRenderingContext2D, at: Point): void {
@@ -75,7 +77,7 @@ export function drawSegmentStroke(
 ): Point | null {
   if (segment.points.length < 2) return null
   ctx.strokeStyle = segment.color || defaultColor
-  ctx.lineWidth = 1.5
+  ctx.lineWidth = STROKE_LINE_WIDTH_PX
   ctx.beginPath()
   appendSegmentPath(ctx, segment, projector)
   ctx.stroke()

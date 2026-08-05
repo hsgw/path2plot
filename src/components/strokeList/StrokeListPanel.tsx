@@ -29,8 +29,11 @@ interface StrokeListPanelProps {
   fillOverrides: Map<string, Partial<FillSettings>>
   onPatchFillOverride: (fillId: string, patch: Partial<FillSettings>) => void
   onResetFillOverride: (fillId: string) => void
-  /** FR-43: クリックで選択中の行のキー(ホバー中の行はCSSの:hoverで表現するため受け取らない) */
+  /** FR-43: クリックで選択中の行のキー(リスト内マウス由来のホバーはCSSの:hoverで表現する) */
   selectedKey: string | null
+  /** プレビュー側でホバー中のセグメントに対応する行のキー。リスト内マウス由来のホバーは
+   * :hoverが担うため、こちらはプレビュー発のホバーだけを属性セレクタで表現する */
+  previewHoverKey: string | null
   onHover: (selection: HighlightSelection | null) => void
   onSelect: (selection: HighlightSelection) => void
 }
@@ -49,6 +52,7 @@ const MAX_PANEL_WIDTH = 640
  */
 function buildRowRules(
   selectedKey: string | null,
+  previewHoverKey: string | null,
   contextMenuKey: string | null,
 ): string {
   const rules: string[] = []
@@ -56,6 +60,13 @@ function buildRowRules(
     rules.push(
       `.stroke-list [data-hl-key="${selectedKey}"]{background:var(--highlight-selected-bg);box-shadow:inset 2px 0 0 var(--highlight-selected-bar)}`,
       `.stroke-list [data-hl-key="${selectedKey}"].stroke-list-item-pending{opacity:0.75}`,
+    )
+  }
+  // FR-43: プレビュー上でのホバーは、リスト内マウス由来の:hoverと同じ見た目にする
+  if (previewHoverKey !== null) {
+    rules.push(
+      `.stroke-list [data-hl-key="${previewHoverKey}"]{background:var(--highlight-hover-bg);box-shadow:inset 2px 0 0 var(--highlight-hover-bar)}`,
+      `.stroke-list [data-hl-key="${previewHoverKey}"].stroke-list-item-pending{opacity:0.75}`,
     )
   }
   if (contextMenuKey !== null) {
@@ -76,6 +87,7 @@ function StrokeListPanelImpl({
   onPatchFillOverride,
   onResetFillOverride,
   selectedKey,
+  previewHoverKey,
   onHover,
   onSelect,
 }: StrokeListPanelProps) {
@@ -177,7 +189,11 @@ function StrokeListPanelImpl({
     window.addEventListener('mouseup', handleMouseUp)
   }, [])
 
-  const rowRules = buildRowRules(selectedKey, contextMenu?.target.key ?? null)
+  const rowRules = buildRowRules(
+    selectedKey,
+    previewHoverKey,
+    contextMenu?.target.key ?? null,
+  )
 
   return (
     <section

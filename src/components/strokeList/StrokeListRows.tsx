@@ -1,4 +1,5 @@
 import { memo, useMemo } from 'react'
+import { groupEntries } from '../../core/plan/highlight'
 import type {
   FillListEntry,
   HighlightSelection,
@@ -12,43 +13,6 @@ import {
   findHighlightTarget,
   strokeRowKey,
 } from './rowKeys'
-
-/**
- * FR-40の階層表示用に、フラットなListEntry列をブロック単位へまとめたもの。
- * blockは同一結合ブロックに属する連続したstroke行、fillは塗りブロック1つ。
- * 単独ストローク(結合されていないblock)はblockとして扱いつつ、行の見た目は個別ストロークのままとする
- */
-type ListGroup =
-  | {
-      kind: 'block'
-      key: string
-      /** グループ先頭がListEntry全体の何番目か(FR-23のステップ換算に使う) */
-      startIndex: number
-      entries: StrokeListEntry[]
-    }
-  | { kind: 'fill'; key: string; index: number; entry: FillListEntry }
-
-function groupEntries(entries: ListEntry[]): ListGroup[] {
-  const result: ListGroup[] = []
-  entries.forEach((entry, index) => {
-    if (entry.kind === 'fill') {
-      result.push({ kind: 'fill', key: entry.id, index, entry })
-      return
-    }
-    const last = result.at(-1)
-    if (last?.kind === 'block' && last.entries[0].blockId === entry.blockId) {
-      last.entries.push(entry)
-      return
-    }
-    result.push({
-      kind: 'block',
-      key: entry.id,
-      startIndex: index,
-      entries: [entry],
-    })
-  })
-  return result
-}
 
 /** block行/fill行の開閉トグル。子を持たない行では同幅のスペーサーで桁を揃える */
 function ExpandToggle({

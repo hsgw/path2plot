@@ -13,6 +13,9 @@ interface PreviewHeaderProps {
   playing: boolean
   onStep: (next: number) => void
   onTogglePlaying: () => void
+  /** FR-24の開始点◯・方向矢印の表示切り替え */
+  showDirection: boolean
+  onToggleShowDirection: () => void
 }
 
 /** プレビュー列のタイトル欄とステップ実行の操作ボタン(FR-23) */
@@ -28,6 +31,8 @@ export function PreviewHeader({
   playing,
   onStep,
   onTogglePlaying,
+  showDirection,
+  onToggleShowDirection,
 }: PreviewHeaderProps) {
   return (
     <div className="panel-header">
@@ -45,6 +50,15 @@ export function PreviewHeader({
         </span>
       </div>
       <div className="preview-step-controls">
+        <button
+          type="button"
+          className={showDirection ? 'preview-toggle-active' : undefined}
+          aria-pressed={showDirection}
+          onClick={onToggleShowDirection}
+          title="開始点・方向の表示を切り替え"
+        >
+          開始点/方向
+        </button>
         <button
           type="button"
           onClick={() => onStep(Math.max(0, step - 1))}
