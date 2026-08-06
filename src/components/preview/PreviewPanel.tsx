@@ -1,6 +1,7 @@
 import {
   memo,
   type MouseEvent as ReactMouseEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -51,6 +52,8 @@ interface PreviewPanelProps {
   bedHeightMm: number
   /** FR-28: ペン先の太さ(mm)。0=未入力(実太さ表示は無効化される) */
   penWidthMm: number
+  /** エラー・警告バナー群。プレビュー要素のレイアウトを動かさないよう、キャンバス上に重ねて下部表示する */
+  errorBanners?: ReactNode
 }
 
 /** コンテナのサイズ変化を監視する(実際に変化したときだけstateを更新し、rAFでコアレスする) */
@@ -116,6 +119,7 @@ function PreviewPanelImpl({
   bedWidthMm,
   bedHeightMm,
   penWidthMm,
+  errorBanners,
 }: PreviewPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasBaseRef = useRef<HTMLCanvasElement>(null)
@@ -394,6 +398,7 @@ function PreviewPanelImpl({
         <canvas ref={canvasActiveRef} className="preview-canvas" />
         <canvas ref={canvasHighlightRef} className="preview-canvas" />
         <canvas ref={canvasMarkersRef} className="preview-canvas" />
+        <div className="preview-error-overlay">{errorBanners}</div>
       </div>
     </section>
   )

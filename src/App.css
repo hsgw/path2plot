@@ -274,6 +274,22 @@ label.settings-checkbox-label {
   border-bottom-color: var(--text-h);
 }
 
+/* プレビューのCanvas上に重ねて表示する。position:absoluteでcanvasの並び・サイズには影響しない */
+.preview-error-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+}
+
+.preview-error-overlay > * {
+  pointer-events: auto;
+}
+
 .error-banner {
   flex-shrink: 0;
   max-height: 30vh;

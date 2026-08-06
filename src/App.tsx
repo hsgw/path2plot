@@ -313,10 +313,6 @@ function App() {
         phase={processing.phase}
         percent={processing.percent}
       />
-      <ParseErrorBanner errors={parseResult?.errors ?? []} />
-      <BoundsWarningBanner warnings={boundsWarnings} />
-      <FillErrorBanner errors={fillErrors} />
-      <InvalidInputBanner labels={invalidFieldLabels} />
       <div className="app-layout">
         <SettingsPanel
           settings={settings}
@@ -360,6 +356,14 @@ function App() {
           bedWidthMm={gcodeSettings.bedWidthMm}
           bedHeightMm={gcodeSettings.bedHeightMm}
           penWidthMm={penWidthMm}
+          errorBanners={
+            <>
+              <ParseErrorBanner errors={parseResult?.errors ?? []} />
+              <BoundsWarningBanner warnings={boundsWarnings} />
+              <FillErrorBanner errors={fillErrors} />
+              <InvalidInputBanner labels={invalidFieldLabels} />
+            </>
+          }
         />
         <StrokeListPanel
           entries={plan.listEntries}
