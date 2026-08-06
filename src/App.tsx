@@ -1,6 +1,8 @@
 import { useCallback, useDeferredValue, useMemo, useState } from 'react'
 import './App.css'
 import { downloadTextFile, gcodeFileNameFor } from './app/downloadFile'
+import { loadDefaultSettingsPreset } from './app/settingsStorage'
+import type { SettingsBundle } from './app/settingsStorage'
 import { useHighlightSelection } from './app/useHighlightSelection'
 import {
   EMPTY_FILL_OVERRIDES,
@@ -37,23 +39,33 @@ function App() {
   const [svgText, setSvgText] = useState<string | null>(null)
   const [fileName, setFileName] = useState<string | null>(null)
   const [loadId, setLoadId] = useState(0)
+  // 起動時、デフォルトとして保存された設定プリセットがあれば自動的に読み込む
   const [settings, setSettings] = useState<ParseSettings>(
-    DEFAULT_PARSE_SETTINGS,
+    () => loadDefaultSettingsPreset()?.parseSettings ?? DEFAULT_PARSE_SETTINGS,
   )
-  const [gcodeSettings, setGcodeSettings] = useState(DEFAULT_GCODE_SETTINGS)
+  const [gcodeSettings, setGcodeSettings] = useState(
+    () => loadDefaultSettingsPreset()?.gcodeSettings ?? DEFAULT_GCODE_SETTINGS,
+  )
   // FR-17〜21: 塗りつぶし設定。ペン(レイヤー)概念導入(Phase7)前は、
   // 全ての塗りブロックに共通の設定として全体で共有する(joinDistanceMmと同じ簡略化パターン)
-  const [fillSettings, setFillSettings] = useState(DEFAULT_FILL_SETTINGS)
+  const [fillSettings, setFillSettings] = useState(
+    () => loadDefaultSettingsPreset()?.fillSettings ?? DEFAULT_FILL_SETTINGS,
+  )
   // 塗りの個別上書き(fillId→変更されたフィールドのみ)。未上書きのフィールドはfillSettingsへ追従する
   const [fillOverrides, setFillOverrides] =
     useState<Map<string, Partial<FillSettings>>>(EMPTY_FILL_OVERRIDES)
   // FR-14: 端点結合。距離閾値+個別上書きから毎回再計算する
-  const [joinDistanceMm, setJoinDistanceMm] = useState(DEFAULT_JOIN_DISTANCE_MM)
+  const [joinDistanceMm, setJoinDistanceMm] = useState(
+    () =>
+      loadDefaultSettingsPreset()?.joinDistanceMm ?? DEFAULT_JOIN_DISTANCE_MM,
+  )
   const [joinOverrides, setJoinOverrides] =
     useState<Map<string, boolean>>(EMPTY_JOIN_OVERRIDES)
   // ペン先の太さ(mm)。0=未入力。Phase7(ペン分割)前は全体共有の設定とし、
   // 変更された瞬間だけ結合距離・線間隔・塗りオフセットへ一度反映する(以降は個別に自由編集できる)
-  const [penWidthMm, setPenWidthMm] = useState(0)
+  const [penWidthMm, setPenWidthMm] = useState(
+    () => loadDefaultSettingsPreset()?.penWidthMm ?? 0,
+  )
 
   // 数値入力欄で不正な値が確定されたまま残っている項目のラベル一覧(パネルごとに集計)
   const [settingsInvalidLabels, setSettingsInvalidLabels] = useState<string[]>(
@@ -156,6 +168,27 @@ function App() {
     setFillOverrides(EMPTY_FILL_OVERRIDES)
     processing.resetJoin()
   }, [processing])
+  // 保存/ロード対象となる設定一式。現在読み込み中のSVGやストローク並び順は含まない
+  const settingsBundle = useMemo<SettingsBundle>(
+    () => ({
+      parseSettings: settings,
+      gcodeSettings,
+      fillSettings,
+      joinDistanceMm,
+      penWidthMm,
+    }),
+    [settings, gcodeSettings, fillSettings, joinDistanceMm, penWidthMm],
+  )
+  const handleLoadSettingsBundle = useCallback(
+    (bundle: SettingsBundle): void => {
+      setSettings(bundle.parseSettings)
+      setGcodeSettings(bundle.gcodeSettings)
+      setFillSettings(bundle.fillSettings)
+      setJoinDistanceMm(bundle.joinDistanceMm)
+      setPenWidthMm(bundle.penWidthMm)
+    },
+    [],
+  )
   const handleFileSelected = useCallback((text: string, name: string): void => {
     setSvgText(text)
     setFileName(name)
@@ -273,6 +306,8 @@ function App() {
           canDownloadGcode={canDownloadGcode}
           boundsWarningCount={boundsWarnings.length}
           onDownloadGcode={handleDownloadGcode}
+          settingsBundle={settingsBundle}
+          onLoadSettingsBundle={handleLoadSettingsBundle}
         />
         <PreviewPanel
           fileName={fileName}

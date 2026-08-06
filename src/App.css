@@ -49,7 +49,6 @@
   background: rgba(10, 132, 255, 0.35);
 }
 
-.panel-settings.panel-collapsed,
 .panel-stroke-list.panel-collapsed {
   flex: 0 0 40px;
 }
@@ -63,7 +62,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  height: 40px;
+  padding: 0 12px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -114,9 +114,12 @@
   font-size: 13px;
 }
 
-.settings-group label.settings-checkbox-label {
+.settings-group label.settings-checkbox-label,
+label.settings-checkbox-label {
   flex-direction: row;
   align-items: center;
+  gap: 6px;
+  font-size: 13px;
 }
 
 .settings-group select {
@@ -131,10 +134,48 @@
   margin: 0 0 4px;
 }
 
-.settings-hint {
+/* 設定項目のラベルテキストと補足説明(InfoHint)を同じ行に並べるための行コンテナ */
+.field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* 設定項目の補足説明。?アイコンをホバー/クリックすると吹き出しで説明文を表示する */
+.info-hint {
+  position: relative;
+  display: inline-flex;
+}
+
+.info-hint-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  font: inherit;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.info-hint-trigger:hover {
+  color: var(--text-h);
+}
+
+.info-hint-bubble {
+  position: fixed;
+  z-index: 20;
+  width: 220px;
+  padding: 6px 8px;
   font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
   color: var(--text);
-  margin: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 25%);
 }
 
 .settings-template-textarea {
@@ -144,6 +185,32 @@
   font-size: 11px;
   resize: vertical;
   box-sizing: border-box;
+}
+
+/* テンプレートgcode内で使える変数の折りたたみ一覧 */
+.gcode-template-vars-details {
+  margin-bottom: 12px;
+}
+
+.gcode-template-vars-details summary {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-h);
+  cursor: pointer;
+}
+
+.gcode-template-vars {
+  width: 100%;
+  margin-top: 6px;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.gcode-template-vars td {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
 }
 
 .settings-warning-text {
@@ -502,10 +569,17 @@
 .settings-actions {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  /* グループ間(保存・ロード / 読み込み・並び順操作 / G-code出力)は間隔を空けて分ける */
+  gap: 14px;
   margin-bottom: 16px;
   padding: 0 12px;
   flex-shrink: 0;
+}
+
+.settings-actions-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .settings-actions button {
@@ -644,4 +718,202 @@
   margin: 0;
   font-size: 11px;
   color: var(--text);
+}
+
+/* 使い方ポップアップ。ProcessingOverlayと同じ中央固定バックドロップ+カードのパターンだが、
+   ユーザー操作で閉じられる点が異なるためクラス名は独立させる */
+.help-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 35%);
+}
+
+.help-dialog {
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
+  font-size: 13px;
+  color: var(--text);
+}
+
+.help-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.help-dialog-close {
+  padding: 0 6px;
+  font-size: 14px;
+  line-height: 1.4;
+  border: none;
+  border-radius: 3px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.help-dialog-close:hover {
+  background: rgb(10 132 255 / 22%);
+  color: var(--text-h);
+}
+
+.help-dialog-section h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0 0 4px;
+}
+
+.help-dialog-section ol {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.help-dialog-section li {
+  margin-bottom: 2px;
+}
+
+.help-dialog-hint {
+  font-size: 11px;
+  color: var(--text);
+  margin: 6px 0 0;
+}
+
+.help-dialog-license-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+/* リセット確認・プリセット削除確認などの汎用確認ダイアログ。help-dialogより小さい固定幅カード */
+.confirm-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 35%);
+}
+
+.confirm-dialog {
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
+  font-size: 13px;
+  color: var(--text);
+}
+
+.confirm-dialog h2 {
+  margin: 0;
+}
+
+.confirm-dialog-message {
+  margin: 0;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.confirm-dialog-danger {
+  color: var(--error-text);
+  border-color: var(--error-border);
+}
+
+/* 設定の保存/ロードダイアログ。バックドロップ・カードはhelp-dialogのスタイルを流用する */
+.settings-preset-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-preset-form label:not(.settings-checkbox-label) {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.settings-preset-form input[type='text'] {
+  width: 100%;
+}
+
+.settings-preset-hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text);
+}
+
+.settings-preset-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-preset-list-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.settings-preset-list-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+  word-break: break-all;
+}
+
+.settings-preset-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 400;
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+}
+
+.settings-preset-list-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
 }

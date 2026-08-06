@@ -32,30 +32,25 @@ export function FillSettingsPanel({
 
   return (
     <div className="settings-group">
-      <h3>塗りつぶし設定(FR-17〜21)</h3>
+      <h3>塗りつぶし設定</h3>
       <label className="settings-checkbox-label">
         <input
           type="checkbox"
           checked={settings.drawOutline}
           onChange={(e) => update({ drawOutline: e.target.checked })}
         />
-        輪郭線を描く(FR-21)
+        輪郭線を描く
       </label>
       <NumberField
         label="塗りオフセット(mm)"
         value={settings.fillOffsetMm}
         step={0.1}
+        hint="「ペン設定」でペン先の太さを変更すると、その瞬間の値(と重ね量)で線間隔・塗りオフセットが一度だけ再計算されます。以降はそれぞれ個別に編集でき、太さ側の変更を継続的に追従することはありません"
         onCommit={(fillOffsetMm) => update({ fillOffsetMm })}
         onValidityChange={(valid) =>
           setValidity('fillOffsetMm', '塗りオフセット', valid)
         }
       />
-      <p className="settings-hint">
-        ペン(レイヤー)概念導入(Phase7)前は、全ての塗りブロックに共通の設定として適用されます。
-        「ペン設定」でペン先の太さを変更すると、その瞬間の値(と重ね量)で線間隔・塗りオフセットが
-        一度だけ再計算されます(FR-19/FR-20)。以降はそれぞれ個別に編集でき、太さ側の変更を
-        継続的に追従することはありません
-      </p>
       <label>
         塗りつぶし方式
         <select

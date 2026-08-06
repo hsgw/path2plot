@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
+import { InfoHint } from './InfoHint'
 
 interface NumberFieldProps {
   label: string
   value: number
   step?: number
   min?: number
+  /** 補足説明。指定すると?アイコンを添え、ホバー/クリックで表示する */
+  hint?: string
   onCommit: (value: number) => void
   onValidityChange: (valid: boolean) => void
 }
@@ -27,6 +30,7 @@ export function NumberField({
   value,
   step = 1,
   min,
+  hint,
   onCommit,
   onValidityChange,
 }: NumberFieldProps) {
@@ -57,7 +61,11 @@ export function NumberField({
 
   return (
     <label>
-      {label}
+      {hint ? (
+        <InfoHint text={hint}>{label}</InfoHint>
+      ) : (
+        <span className="field-label">{label}</span>
+      )}
       <input
         type="number"
         step={step}
