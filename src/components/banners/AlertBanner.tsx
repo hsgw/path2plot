@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { XMarkIcon } from '../common/icons'
 
 interface AlertBannerProps {
   /** 見出し。件数や「解消するまで〜できません」等の但し書きも含めて呼び出し側が組み立てる */
@@ -34,7 +35,7 @@ export function AlertBanner({
         <h3>{title}</h3>
         {dismissible && (
           <button type="button" onClick={() => setClosedSignature(signature)}>
-            ×
+            <XMarkIcon />
           </button>
         )}
       </div>

@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { XMarkIcon } from '../common/icons'
 import { FillSettingsPanel } from '../settings/FillSettingsPanel'
 import { resolveEffectiveFillSettings } from '../../core/fill/overrides'
 import type { FillSettings } from '../../core/fill/types'
@@ -53,7 +54,7 @@ export function FillOverridePopover({
           className="fill-override-popover-close"
           onClick={onClose}
         >
-          ×
+          <XMarkIcon />
         </button>
       </div>
       <button

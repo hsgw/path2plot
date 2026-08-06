@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { ChevronDoubleLeftIcon, ChevronDoubleRightIcon } from '../common/icons'
 import { resolveEffectiveFillSettings } from '../../core/fill/overrides'
 import type { FillSettings } from '../../core/fill/types'
 import type { HighlightSelection, ListEntry } from '../../core/plan/types'
@@ -206,7 +207,7 @@ function StrokeListPanelImpl({
       )}
       <div className="panel-header">
         <button type="button" onClick={() => setIsOpen((v) => !v)}>
-          {isOpen ? '»' : '«'}
+          {isOpen ? <ChevronDoubleRightIcon /> : <ChevronDoubleLeftIcon />}
         </button>
         {isOpen && <h2>ストローク</h2>}
       </div>

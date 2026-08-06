@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { FillSettings } from '../../core/fill/types'
 import type { GcodeSettings } from '../../core/gcode/types'
 import type { ParseSettings } from '../../core/svg/types'
+import { ChevronDoubleLeftIcon, ChevronDoubleRightIcon } from '../common/icons'
 import { NumberField } from '../common/NumberField'
 import { FillSettingsPanel } from './FillSettingsPanel'
 import { GcodeSettingsPanel } from './GcodeSettingsPanel'
@@ -71,7 +72,7 @@ export function SettingsPanel({
       <div className="panel-header">
         {isOpen && <h2>設定</h2>}
         <button type="button" onClick={() => setIsOpen((v) => !v)}>
-          {isOpen ? '«' : '»'}
+          {isOpen ? <ChevronDoubleLeftIcon /> : <ChevronDoubleRightIcon />}
         </button>
       </div>
       {isOpen && (

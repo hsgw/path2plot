@@ -1,4 +1,11 @@
 import { memo, useMemo } from 'react'
+import {
+  ArrowUturnLeftIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  ExclamationTriangleIcon,
+  LinkIcon,
+} from '../common/icons'
 import { groupEntries } from '../../core/plan/highlight'
 import type {
   FillListEntry,
@@ -30,7 +37,7 @@ function ExpandToggle({
       onClick={onToggle}
       title={expanded ? '中身を畳む' : '中身を展開'}
     >
-      {expanded ? '▼' : '▶'}
+      {expanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
     </button>
   )
 }
@@ -110,7 +117,7 @@ const BlockRow = memo(function BlockRow({
           style={{ backgroundColor: first.color }}
         />
         <span className="stroke-list-label">
-          🔗 block({entries.length}本)
+          <LinkIcon /> block({entries.length}本)
           {first.sourceId ? ` — id="${first.sourceId}"` : ''}
         </span>
       </div>
@@ -234,12 +241,12 @@ const FillRow = memo(function FillRow({
             data-fill-reset-id={entry.id}
             title="個別設定を元に戻す(グローバル設定を使う)"
           >
-            ↺
+            <ArrowUturnLeftIcon />
           </button>
         )}
         {entry.error && (
           <span className="stroke-list-fill-error" title={entry.error.message}>
-            ⚠
+            <ExclamationTriangleIcon />
           </span>
         )}
       </div>
