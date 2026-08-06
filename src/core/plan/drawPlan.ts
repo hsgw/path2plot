@@ -17,13 +17,13 @@ export interface DrawPlanCounts {
  * 同じ materializeDrawUnit の結果から派生する値なので、まとめて1回の走査で作る。
  */
 export interface DrawPlan {
-  /** ストローク並び順リストの行(FR-23のステップの単位でもある) */
+  /** ストローク並び順リストの行 */
   listEntries: ListEntry[]
   /** プレビュー描画用のセグメント。結合ブロックは構成ストロークごとに1本ずつ持つ */
   previewSegments: PreviewSegment[]
   /**
    * listEntries[i]までが対応するpreviewSegmentsの本数の累積和(長さ listEntries.length + 1)。
-   * ステップ位置・ハイライト範囲をO(1)でセグメント番号へ変換するために持つ
+   * ハイライト範囲(FR-43)をO(1)でセグメント番号へ変換するために持つ
    */
   segmentCountPrefix: number[]
   /** G-code出力単位(1要素=1回のペンダウン〜アップ) */

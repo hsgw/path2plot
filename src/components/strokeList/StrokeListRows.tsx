@@ -42,22 +42,17 @@ function ExpandToggle({
   )
 }
 
-/**
- * 個別ストロークの行。memo化することで、ステップ操作時に実際にpending(未描画/描画済み)が
- * 変化した行だけが再レンダされ、リスト全体(最大数万行)の再構築を避ける
- */
+/** 個別ストロークの行。memo化することでリスト全体(最大数万行)の不要な再構築を避ける */
 const StrokeRow = memo(function StrokeRow({
   entry,
   index,
-  pending,
 }: {
   entry: StrokeListEntry
   index: number
-  pending: boolean
 }) {
   return (
     <li
-      className={`stroke-list-item stroke-list-item-clickable${pending ? ' stroke-list-item-pending' : ''}`}
+      className="stroke-list-item stroke-list-item-clickable"
       // FR-43: 個別ストロークは常にListEntry1件=プレビューの1セグメントに対応する
       data-hl-key={strokeRowKey(entry.id)}
       data-hl-index={index}
@@ -82,26 +77,21 @@ const BlockRow = memo(function BlockRow({
   groupKey,
   entries,
   startIndex,
-  drawnCount,
   expanded,
   onToggleExpanded,
 }: {
   groupKey: string
   entries: StrokeListEntry[]
   startIndex: number
-  /** このブロック内で既に描画済みのストローク数(FR-23のステップ換算済み) */
-  drawnCount: number
   expanded: boolean
   /** 親から安定した参照で受け取る(行ごとにクロージャを作るとmemoが効かなくなるため) */
   onToggleExpanded: (key: string) => void
 }) {
   const first = entries[0]
-  const pending = drawnCount === 0
-  const partial = drawnCount > 0 && drawnCount < entries.length
   return (
     <li className="stroke-list-block">
       <div
-        className={`stroke-list-item stroke-list-item-block stroke-list-item-clickable${pending ? ' stroke-list-item-pending' : ''}${partial ? ' stroke-list-item-partial' : ''}`}
+        className="stroke-list-item stroke-list-item-block stroke-list-item-clickable"
         // FR-43: block行のハイライトはブロック内の全ストロークが対象
         data-hl-key={blockRowKey(groupKey)}
         data-hl-index={startIndex}
@@ -124,12 +114,7 @@ const BlockRow = memo(function BlockRow({
       {expanded && (
         <ol className="stroke-list stroke-list-children">
           {entries.map((entry, i) => (
-            <StrokeRow
-              key={entry.id}
-              entry={entry}
-              index={startIndex + i}
-              pending={i >= drawnCount}
-            />
+            <StrokeRow key={entry.id} entry={entry} index={startIndex + i} />
           ))}
         </ol>
       )}
@@ -191,19 +176,17 @@ function FillParamsRow({ entry }: { entry: FillListEntry }) {
 }
 
 /**
- * FR-22: 塗りブロック(リスト上の表記はfill)の行。FR-23のステップ上は常に1ブロック=1ステップで、
- * 個別ハッチ線は並び替え対象としない。blockと同様、中身(輪郭線・ハッチ線)は既定で畳んでおく。memo化
+ * FR-22: 塗りブロック(リスト上の表記はfill)の行。個別ハッチ線は並び替え対象としない。
+ * blockと同様、中身(輪郭線・ハッチ線)は既定で畳んでおく。memo化
  */
 const FillRow = memo(function FillRow({
   entry,
   index,
-  pending,
   expanded,
   onToggleExpanded,
 }: {
   entry: FillListEntry
   index: number
-  pending: boolean
   expanded: boolean
   /** BlockRowと同様、安定した参照を受け取りキー(entry.id)を渡し返す */
   onToggleExpanded: (key: string) => void
@@ -212,7 +195,7 @@ const FillRow = memo(function FillRow({
   return (
     <li className="stroke-list-block">
       <div
-        className={`stroke-list-item stroke-list-item-fill stroke-list-item-clickable${pending ? ' stroke-list-item-pending' : ''}${entry.overridden ? ' stroke-list-item-overridden' : ''}`}
+        className={`stroke-list-item stroke-list-item-fill stroke-list-item-clickable${entry.overridden ? ' stroke-list-item-overridden' : ''}`}
         // FR-43: fill行のハイライトは輪郭線・ハッチ線を含むブロック全体が対象
         data-hl-key={fillRowKey(entry.id)}
         data-hl-index={index}
@@ -288,7 +271,6 @@ const FillRow = memo(function FillRow({
  */
 export const StrokeListRows = memo(function StrokeListRows({
   entries,
-  step,
   expandedKeys,
   onToggleExpanded,
   onHover,
@@ -297,7 +279,6 @@ export const StrokeListRows = memo(function StrokeListRows({
   onResetFillOverride,
 }: {
   entries: ListEntry[]
-  step: number
   expandedKeys: ReadonlySet<string>
   onToggleExpanded: (key: string) => void
   onHover: (selection: HighlightSelection | null) => void
@@ -351,7 +332,6 @@ export const StrokeListRows = memo(function StrokeListRows({
             key={group.key}
             entry={group.entry}
             index={group.index}
-            pending={group.index >= step}
             expanded={expandedKeys.has(group.key)}
             onToggleExpanded={onToggleExpanded}
           />
@@ -360,7 +340,6 @@ export const StrokeListRows = memo(function StrokeListRows({
             key={group.key}
             entry={group.entries[0]}
             index={group.startIndex}
-            pending={group.startIndex >= step}
           />
         ) : (
           <BlockRow
@@ -368,10 +347,6 @@ export const StrokeListRows = memo(function StrokeListRows({
             groupKey={group.key}
             entries={group.entries}
             startIndex={group.startIndex}
-            drawnCount={Math.max(
-              0,
-              Math.min(step - group.startIndex, group.entries.length),
-            )}
             expanded={expandedKeys.has(group.key)}
             onToggleExpanded={onToggleExpanded}
           />

@@ -416,24 +416,17 @@ label.settings-checkbox-label {
   white-space: nowrap;
 }
 
-.preview-step-controls {
+.preview-controls {
   display: flex;
   align-items: center;
   gap: 16px;
   font-size: 12px;
 }
 
-.preview-toggle-group,
-.preview-step-buttons {
+.preview-toggle-group {
   display: flex;
   align-items: center;
   gap: 6px;
-}
-
-.preview-step-indicator {
-  color: var(--text);
-  min-width: 3.5em;
-  text-align: right;
 }
 
 .preview-toggle-active {
@@ -459,10 +452,6 @@ label.settings-checkbox-label {
   font-size: 12px;
 }
 
-.stroke-list-item-pending {
-  opacity: 0.35;
-}
-
 /* FR-43: プレビューをハイライトできる行。色はPreviewPanelのハイライト色と対応させる。
    選択中の行のルールはStrokeListPanelが属性セレクタで差し込むため、色だけをここで定義する */
 .stroke-list {
@@ -482,16 +471,6 @@ label.settings-checkbox-label {
 .stroke-list .stroke-list-item-clickable:hover {
   background: rgba(255, 149, 0, 0.22);
   box-shadow: inset 2px 0 0 #ff9500;
-}
-
-/* ハイライト中は未描画(pending)でも埋もれないよう、薄表示を打ち消す */
-.stroke-list .stroke-list-item-clickable:hover.stroke-list-item-pending {
-  opacity: 0.75;
-}
-
-/* ブロック内の一部だけが描画済みの状態(畳んだブロック行の中間状態) */
-.stroke-list-item-partial {
-  opacity: 0.7;
 }
 
 /* ブロック行(結合ブロック・塗りブロック)と、その配下の子リストを内包するli */

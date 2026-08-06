@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { downloadTextFile, gcodeFileNameFor } from './app/downloadFile'
 import { loadDefaultSettingsPreset } from './app/settingsStorage'
@@ -9,7 +9,6 @@ import {
   EMPTY_JOIN_OVERRIDES,
   useProcessing,
 } from './app/useProcessing'
-import { useStepPlayback } from './app/useStepPlayback'
 import { BoundsWarningBanner } from './components/banners/BoundsWarningBanner'
 import { FillErrorBanner } from './components/banners/FillErrorBanner'
 import { InvalidInputBanner } from './components/banners/InvalidInputBanner'
@@ -38,7 +37,6 @@ import { DEFAULT_PARSE_SETTINGS, type ParseSettings } from './core/svg/types'
 function App() {
   const [svgText, setSvgText] = useState<string | null>(null)
   const [fileName, setFileName] = useState<string | null>(null)
-  const [loadId, setLoadId] = useState(0)
   // ドラッグ&ドロップでのSVG読み込み。子要素をまたぐdragenter/dragleaveの出入りで
   // オーバーレイがちらつかないよう、ネスト深さをカウンタで数える
   const [isDraggingFile, setIsDraggingFile] = useState(false)
@@ -94,7 +92,6 @@ function App() {
   }, [svgText, settings])
   // parseResultが変わらない限り同じ参照を保ち、下流のuseMemoが無駄に再計算されないようにする
   const strokes = useMemo(() => parseResult?.strokes ?? [], [parseResult])
-  const loadKey = svgText === null ? null : String(loadId)
 
   const processing = useProcessing({
     parseResult,
@@ -149,15 +146,6 @@ function App() {
     [units, strokes, optimizedOrder, fillPatternLabels, overriddenFillIds],
   )
 
-  const playback = useStepPlayback({
-    totalSteps: plan.listEntries.length,
-    isProcessing: processing.isProcessing,
-    revealKey: loadKey,
-  })
-  const visibleSegmentCount =
-    plan.segmentCountPrefix[
-      Math.min(playback.step, plan.segmentCountPrefix.length - 1)
-    ] ?? 0
   const highlight = useHighlightSelection(
     plan.listEntries,
     plan.segmentCountPrefix,
@@ -196,7 +184,6 @@ function App() {
   const handleFileSelected = useCallback((text: string, name: string): void => {
     setSvgText(text)
     setFileName(name)
-    setLoadId((id) => id + 1)
     setOptimizedOrder(null)
     setJoinOverrides((prev) => (prev.size === 0 ? prev : EMPTY_JOIN_OVERRIDES))
     setFillOverrides((prev) => (prev.size === 0 ? prev : EMPTY_FILL_OVERRIDES))
@@ -308,10 +295,6 @@ function App() {
     [processing.fillBlocks],
   )
 
-  // ストローク並び順リストの再構築(数万行になりうる)は低優先度の更新として扱い、
-  // プレビューCanvas側の即時反映をブロックしないようにする
-  const deferredStep = useDeferredValue(playback.step)
-
   return (
     <div
       className="app-shell"
@@ -370,7 +353,6 @@ function App() {
           fillStrokeCount={plan.counts.fillStrokeCount}
           joinApplied={processing.joinActivated}
           optimizeApplied={optimizeApplied}
-          visibleSegmentCount={visibleSegmentCount}
           hoverHighlight={highlight.hoverHighlight}
           selectedHighlight={highlight.selectedHighlight}
           onSegmentHover={highlight.onSegmentHover}
@@ -378,15 +360,9 @@ function App() {
           bedWidthMm={gcodeSettings.bedWidthMm}
           bedHeightMm={gcodeSettings.bedHeightMm}
           penWidthMm={penWidthMm}
-          step={playback.step}
-          totalSteps={plan.listEntries.length}
-          playing={playback.playing}
-          onStep={playback.setStep}
-          onTogglePlaying={playback.togglePlaying}
         />
         <StrokeListPanel
           entries={plan.listEntries}
-          step={deferredStep}
           joinOverrides={joinOverrides}
           onSetJoinOverride={handleSetJoinOverride}
           fillSettings={fillSettings}

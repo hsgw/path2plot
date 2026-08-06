@@ -19,8 +19,6 @@ import { StrokeListRows } from './StrokeListRows'
 
 interface StrokeListPanelProps {
   entries: ListEntry[]
-  /** FR-23のステップ実行プレビューと連動させ、未描画の行を薄く表示する */
-  step: number
   /** FR-14: 個別上書き(結合する/しない)の現在値。右クリックメニューの表示・操作に使う */
   joinOverrides: Map<string, boolean>
   onSetJoinOverride: (idA: string, idB: string, join: boolean) => void
@@ -60,14 +58,12 @@ function buildRowRules(
   if (selectedKey !== null) {
     rules.push(
       `.stroke-list [data-hl-key="${selectedKey}"]{background:var(--highlight-selected-bg);box-shadow:inset 2px 0 0 var(--highlight-selected-bar)}`,
-      `.stroke-list [data-hl-key="${selectedKey}"].stroke-list-item-pending{opacity:0.75}`,
     )
   }
   // FR-43: プレビュー上でのホバーは、リスト内マウス由来の:hoverと同じ見た目にする
   if (previewHoverKey !== null) {
     rules.push(
       `.stroke-list [data-hl-key="${previewHoverKey}"]{background:var(--highlight-hover-bg);box-shadow:inset 2px 0 0 var(--highlight-hover-bar)}`,
-      `.stroke-list [data-hl-key="${previewHoverKey}"].stroke-list-item-pending{opacity:0.75}`,
     )
   }
   if (contextMenuKey !== null) {
@@ -80,7 +76,6 @@ function buildRowRules(
 
 function StrokeListPanelImpl({
   entries,
-  step,
   joinOverrides,
   onSetJoinOverride,
   fillSettings,
@@ -215,7 +210,6 @@ function StrokeListPanelImpl({
         <div className="panel-body">
           <StrokeListRows
             entries={entries}
-            step={step}
             expandedKeys={expandedKeys}
             onToggleExpanded={handleToggleExpanded}
             onHover={onHover}

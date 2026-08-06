@@ -7,12 +7,6 @@ interface PreviewHeaderProps {
   /** パス結合(FR-14)・書き順最適化(FR-15)が現在の内容に適用済みかどうか */
   joinApplied: boolean
   optimizeApplied: boolean
-  /** FR-23: ステップ実行プレビュー。ListEntry単位の現在位置・総数 */
-  step: number
-  totalSteps: number
-  playing: boolean
-  onStep: (next: number) => void
-  onTogglePlaying: () => void
   /** FR-24の開始点◯・方向矢印の表示切り替え */
   showDirection: boolean
   onToggleShowDirection: () => void
@@ -22,7 +16,7 @@ interface PreviewHeaderProps {
   penWidthMm: number
 }
 
-/** プレビュー列のタイトル欄とステップ実行の操作ボタン(FR-23) */
+/** プレビュー列のタイトル欄と表示切り替えボタン */
 export function PreviewHeader({
   fileName,
   strokeCount,
@@ -30,11 +24,6 @@ export function PreviewHeader({
   fillStrokeCount,
   joinApplied,
   optimizeApplied,
-  step,
-  totalSteps,
-  playing,
-  onStep,
-  onTogglePlaying,
   showDirection,
   onToggleShowDirection,
   showActualWidth,
@@ -56,7 +45,7 @@ export function PreviewHeader({
           {optimizeApplied && <span className="preview-flag">最適化済み</span>}
         </span>
       </div>
-      <div className="preview-step-controls">
+      <div className="preview-controls">
         <div className="preview-toggle-group">
           <button
             type="button"
@@ -81,32 +70,6 @@ export function PreviewHeader({
           >
             ペン太さ
           </button>
-        </div>
-        <div className="preview-step-buttons">
-          <button
-            type="button"
-            onClick={() => onStep(Math.max(0, step - 1))}
-            disabled={step <= 0}
-          >
-            前へ
-          </button>
-          <button
-            type="button"
-            onClick={() => onStep(Math.min(totalSteps, step + 1))}
-            disabled={step >= totalSteps}
-          >
-            次へ
-          </button>
-          <button
-            type="button"
-            onClick={onTogglePlaying}
-            disabled={totalSteps === 0}
-          >
-            {playing ? '停止' : '再生'}
-          </button>
-          <span className="preview-step-indicator">
-            {step} / {totalSteps}
-          </span>
         </div>
       </div>
     </div>

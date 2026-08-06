@@ -40,8 +40,6 @@ interface PreviewPanelProps {
   fillStrokeCount: number
   joinApplied: boolean
   optimizeApplied: boolean
-  /** segmentsのうち実際に描画済み表示する本数(FR-23: ステップはListEntry単位、セグメント単位ではない) */
-  visibleSegmentCount: number
   /** FR-43: ストロークリストでホバー中/選択中の行に対応するセグメント範囲(未描画分も強調する) */
   hoverHighlight: HighlightRange | null
   selectedHighlight: HighlightRange | null
@@ -53,11 +51,6 @@ interface PreviewPanelProps {
   bedHeightMm: number
   /** FR-28: ペン先の太さ(mm)。0=未入力(実太さ表示は無効化される) */
   penWidthMm: number
-  step: number
-  totalSteps: number
-  playing: boolean
-  onStep: (next: number) => void
-  onTogglePlaying: () => void
 }
 
 /** コンテナのサイズ変化を監視する(実際に変化したときだけstateを更新し、rAFでコアレスする) */
@@ -100,11 +93,10 @@ function useContainerSize(
 }
 
 /**
- * プレビュー列。描画は4枚のCanvasを重ねて分担する(ステップ操作のたびに全体を描き直すと
- * 大規模SVGで数百msかかるため):
- *  - ベース: ベッドの白塗り+全セグメントのゴースト表示(stepに依存しない)
- *  - アクティブ: 実色(またはFR-28の実太さ表示中は黒)の描画+ペンアップ移動(stepに追従、進む方向は追記のみ)
- *  - マーカー: 開始点◯+方向矢印(固定色・固定線幅、stepに追従、進む方向は追記のみ)。
+ * プレビュー列。描画は4枚のCanvasを重ねて分担する:
+ *  - ベース: ベッドの白塗り+全セグメントのゴースト表示
+ *  - アクティブ: 実色(またはFR-28の実太さ表示中は黒)の描画+ペンアップ移動
+ *  - マーカー: 開始点◯+方向矢印(固定色・固定線幅)。
  *    アクティブレイヤーより上に独立したCanvasとして重ね、インクの太さ・描画順に関わらず
  *    常にインクの上に見えるようにする
  *  - ハイライト: リストのホバー/選択に対応する強調(毎回クリアして描き直す)
@@ -117,7 +109,6 @@ function PreviewPanelImpl({
   fillStrokeCount,
   joinApplied,
   optimizeApplied,
-  visibleSegmentCount,
   hoverHighlight,
   selectedHighlight,
   onSegmentHover,
@@ -125,11 +116,6 @@ function PreviewPanelImpl({
   bedWidthMm,
   bedHeightMm,
   penWidthMm,
-  step,
-  totalSteps,
-  playing,
-  onStep,
-  onTogglePlaying,
 }: PreviewPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasBaseRef = useRef<HTMLCanvasElement>(null)
@@ -176,7 +162,7 @@ function PreviewPanelImpl({
   // 太さ未入力のままの場合は従来通りSVGの色で表示する
   const strokeColorOverride = penWidthMm > 0 ? '#000' : undefined
 
-  // ベースレイヤー(stepに依存しない静的レイヤー)
+  // ベースレイヤー(静的レイヤー)
   useEffect(() => {
     const canvas = canvasBaseRef.current
     if (!canvas || view.width === 0 || view.height === 0) return
@@ -214,45 +200,35 @@ function PreviewPanelImpl({
     ctx.restore()
   }, [segments, view, lineWidthPx, strokeColorOverride])
 
-  // アクティブレイヤー: 直前の描画からsegments/viewが変わらず可視本数が増えただけの場合
-  // (次へ/再生)は新規区間だけを追記描画し、それ以外(戻す/再読込/リサイズ)は描き直す
+  // アクティブレイヤー: segments/viewが直前の描画から変わっていなければ再描画をスキップし、
+  // それ以外(新規ファイル・リサイズ・表示切り替え等)は描き直す
   useEffect(() => {
     const canvas = canvasActiveRef.current
     if (!canvas || view.width === 0 || view.height === 0) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    const canAppend =
+    const alreadyDrawn =
       lastSegmentsRef.current === segments &&
       lastViewRef.current === view &&
       lastLineWidthPxRef.current === lineWidthPx &&
-      visibleSegmentCount >= renderedCountRef.current
+      renderedCountRef.current === segments.length
 
-    if (!canAppend) {
+    if (!alreadyDrawn) {
       resetCanvas(canvas, ctx, view)
-      renderedCountRef.current = 0
-    }
 
-    const start = renderedCountRef.current
-    if (start < visibleSegmentCount) {
       const projector = createProjector(view)
       const defaultColor = defaultColorRef.current
 
-      drawPenLifts(
-        ctx,
-        segments,
-        Math.max(0, start - 1),
-        visibleSegmentCount,
-        projector,
-      )
+      drawPenLifts(ctx, segments, 0, segments.length, projector)
 
       // FR-26: 実際の色で描画
       ctx.lineJoin = 'round'
       ctx.lineCap = 'round'
-      for (let i = start; i < visibleSegmentCount; i++) {
+      for (const segment of segments) {
         drawSegmentStroke(
           ctx,
-          segments[i],
+          segment,
           projector,
           defaultColor,
           lineWidthPx,
@@ -261,53 +237,49 @@ function PreviewPanelImpl({
       }
     }
 
-    renderedCountRef.current = visibleSegmentCount
+    renderedCountRef.current = segments.length
     lastSegmentsRef.current = segments
     lastViewRef.current = view
     lastLineWidthPxRef.current = lineWidthPx
-  }, [segments, visibleSegmentCount, view, lineWidthPx, strokeColorOverride])
+  }, [segments, view, lineWidthPx, strokeColorOverride])
 
   // マーカーレイヤー(FR-24): 開始点◯・方向矢印は常に固定色・固定線幅で描き、
   // アクティブレイヤー(実太さ表示中は太くなりうるインク)より上に独立したCanvasとして重ねることで、
-  // 描画順に関わらず常にインクの上に見えるようにする。追記描画の方針はアクティブレイヤーと同じ
+  // 描画順に関わらず常にインクの上に見えるようにする
   useEffect(() => {
     const canvas = canvasMarkersRef.current
     if (!canvas || view.width === 0 || view.height === 0) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    const canAppend =
+    const alreadyDrawn =
       lastMarkerSegmentsRef.current === segments &&
       lastMarkerViewRef.current === view &&
       lastMarkerShowDirectionRef.current === showDirection &&
-      visibleSegmentCount >= renderedMarkerCountRef.current
+      renderedMarkerCountRef.current === segments.length
 
-    if (!canAppend) {
+    if (!alreadyDrawn) {
       resetCanvas(canvas, ctx, view)
-      renderedMarkerCountRef.current = 0
-    }
 
-    const start = renderedMarkerCountRef.current
-    if (showDirection && start < visibleSegmentCount) {
-      const projector = createProjector(view)
-      for (let i = start; i < visibleSegmentCount; i++) {
-        const segment = segments[i]
-        if (segment.points.length < 2) continue
-        const p0 = segment.points[0]
-        const startPoint = { x: projector.toX(p0), y: projector.toY(p0) }
-        drawSegmentDirection(ctx, segment, startPoint, projector)
+      if (showDirection) {
+        const projector = createProjector(view)
+        for (const segment of segments) {
+          if (segment.points.length < 2) continue
+          const p0 = segment.points[0]
+          const startPoint = { x: projector.toX(p0), y: projector.toY(p0) }
+          drawSegmentDirection(ctx, segment, startPoint, projector)
+        }
       }
     }
 
-    renderedMarkerCountRef.current = visibleSegmentCount
+    renderedMarkerCountRef.current = segments.length
     lastMarkerSegmentsRef.current = segments
     lastMarkerViewRef.current = view
     lastMarkerShowDirectionRef.current = showDirection
-  }, [segments, visibleSegmentCount, view, showDirection])
+  }, [segments, view, showDirection])
 
-  // ハイライトレイヤー(FR-43): ステップ位置に依存させず未描画のストロークも強調し、
-  // リスト行から位置を辿れるようにする。独立したCanvasに分けることで、
-  // アクティブレイヤーの差分追記描画を壊さずに毎回消去できる
+  // ハイライトレイヤー(FR-43): リスト行から位置を辿れるようにする。
+  // 独立したCanvasに分けることで、アクティブレイヤーの描画を壊さずに毎回消去できる
   useEffect(() => {
     const canvas = canvasHighlightRef.current
     if (!canvas || view.width === 0 || view.height === 0) return
@@ -405,11 +377,6 @@ function PreviewPanelImpl({
         fillStrokeCount={fillStrokeCount}
         joinApplied={joinApplied}
         optimizeApplied={optimizeApplied}
-        step={step}
-        totalSteps={totalSteps}
-        playing={playing}
-        onStep={onStep}
-        onTogglePlaying={onTogglePlaying}
         showDirection={showDirection}
         onToggleShowDirection={toggleShowDirection}
         showActualWidth={showActualWidth}

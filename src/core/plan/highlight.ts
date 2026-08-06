@@ -25,7 +25,7 @@ export type ListGroup =
   | {
       kind: 'block'
       key: string
-      /** グループ先頭がListEntry全体の何番目か(FR-23のステップ換算に使う) */
+      /** グループ先頭がListEntry全体の何番目か(FR-43のハイライト範囲換算に使う) */
       startIndex: number
       entries: StrokeListEntry[]
     }
