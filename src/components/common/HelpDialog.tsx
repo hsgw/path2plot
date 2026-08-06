@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { XMarkIcon } from './icons'
+import { MarkGithubIcon, XMarkIcon } from './icons'
 
 interface HelpDialogProps {
   onClose: () => void
@@ -34,7 +34,7 @@ export function HelpDialog({
         aria-labelledby="help-dialog-title"
       >
         <div className="help-dialog-header">
-          <h2 id="help-dialog-title">使い方</h2>
+          <h2 id="help-dialog-title">path2plot</h2>
           <button
             type="button"
             className="help-dialog-close"
@@ -44,6 +44,22 @@ export function HelpDialog({
             <XMarkIcon />
           </button>
         </div>
+
+        <a
+          className="help-dialog-repo-link"
+          href="https://github.com/hsgw/path2plot"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <MarkGithubIcon /> GitHub
+        </a>
+
+        <section className="help-dialog-section">
+          <h3>免責事項</h3>
+          <p>
+            本ソフトウェアは無保証で提供されます。本ソフトウェアの利用(生成したG-codeによるペンプロッター等のハードウェアの制御を含む)により生じたいかなる損害についても、作者は一切の責任を負いません。自己責任でご利用ください。
+          </p>
+        </section>
 
         <section className="help-dialog-section">
           <h3>基本の流れ</h3>
@@ -68,18 +84,11 @@ export function HelpDialog({
         </section>
 
         <section className="help-dialog-section">
-          <h3>リポジトリ</h3>
-          <a
-            href="https://github.com/hsgw/path2plot"
-            target="_blank"
-            rel="noreferrer"
-          >
-            GitHub
-          </a>
-        </section>
-
-        <section className="help-dialog-section">
           <h3>ライセンス表記</h3>
+          <p>
+            本ソフトウェアはMIT License(© 2026 Takuya Urakawa /
+            5z6p.com)のもとで公開されています。以下は利用している主なライブラリのライセンスです。
+          </p>
           <ul className="help-dialog-license-list">
             <li>
               <a
@@ -108,6 +117,16 @@ export function HelpDialog({
                 rel="noreferrer"
               >
                 Heroicons (mini/solid)
+              </a>{' '}
+              — MIT License
+            </li>
+            <li>
+              <a
+                href="https://github.com/primer/octicons/blob/main/LICENSE"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Octicons
               </a>{' '}
               — MIT License
             </li>

@@ -810,6 +810,20 @@ label.settings-checkbox-label {
   color: var(--text-h);
 }
 
+.help-dialog-repo-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  margin-top: -6px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.help-dialog-repo-link:hover {
+  color: var(--text-h);
+}
+
 .help-dialog-section h3 {
   font-size: 12px;
   font-weight: 600;

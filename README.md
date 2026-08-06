@@ -19,6 +19,10 @@ npm run dev
 - `npm run lint` — Lint実行(oxlint)
 - `npm run format` — Prettierでフォーマット
 
+## 免責事項
+
+本ソフトウェアは無保証で提供されます。本ソフトウェアの利用(生成したG-codeによるペンプロッター等のハードウェアの制御を含む)により生じたいかなる損害についても、作者は一切の責任を負いません。自己責任でご利用ください。
+
 ## ライセンス
 
 MIT © 2026 Takuya Urakawa (5z6p.com)
