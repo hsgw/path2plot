@@ -51,6 +51,9 @@ function App() {
   const [joinDistanceMm, setJoinDistanceMm] = useState(DEFAULT_JOIN_DISTANCE_MM)
   const [joinOverrides, setJoinOverrides] =
     useState<Map<string, boolean>>(EMPTY_JOIN_OVERRIDES)
+  // ペン先の太さ(mm)。0=未入力。Phase7(ペン分割)前は全体共有の設定とし、
+  // 変更された瞬間だけ結合距離・線間隔・塗りオフセットへ一度反映する(以降は個別に自由編集できる)
+  const [penWidthMm, setPenWidthMm] = useState(0)
 
   // 数値入力欄で不正な値が確定されたまま残っている項目のラベル一覧(パネルごとに集計)
   const [settingsInvalidLabels, setSettingsInvalidLabels] = useState<string[]>(
@@ -161,6 +164,19 @@ function App() {
     setJoinOverrides((prev) => (prev.size === 0 ? prev : EMPTY_JOIN_OVERRIDES))
     setFillOverrides((prev) => (prev.size === 0 ? prev : EMPTY_FILL_OVERRIDES))
   }, [])
+  // ペン先の太さが変更された瞬間だけ、結合距離・線間隔・塗りオフセットへ一度だけ反映する
+  // (以降はそれぞれ個別に自由編集でき、太さ側の変更を継続的に追従しない)
+  const handlePenWidthChange = useCallback((next: number): void => {
+    setPenWidthMm(next)
+    if (next > 0) {
+      setJoinDistanceMm(next)
+      setFillSettings((prev) => ({
+        ...prev,
+        spacingMm: next * (1 - prev.overlapPercent / 100),
+        fillOffsetMm: next / 2,
+      }))
+    }
+  }, [])
   const handleSetJoinOverride = useCallback(
     (idA: string, idB: string, join: boolean): void => {
       setJoinOverrides((prev) => {
@@ -243,6 +259,8 @@ function App() {
           onGcodeInvalidChange={setGcodeInvalidLabels}
           joinDistanceMm={joinDistanceMm}
           onJoinDistanceChange={setJoinDistanceMm}
+          penWidthMm={penWidthMm}
+          onPenWidthChange={handlePenWidthChange}
           onJoinPaths={processing.activateJoin}
           onOptimize={handleOptimize}
           onResetAll={handleResetAll}
@@ -271,6 +289,7 @@ function App() {
           onSegmentSelect={highlight.onSegmentSelect}
           bedWidthMm={gcodeSettings.bedWidthMm}
           bedHeightMm={gcodeSettings.bedHeightMm}
+          penWidthMm={penWidthMm}
           step={playback.step}
           totalSteps={plan.listEntries.length}
           playing={playback.playing}

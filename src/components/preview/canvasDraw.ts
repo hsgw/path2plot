@@ -3,20 +3,26 @@ import type { HighlightRange, PreviewSegment } from '../../core/plan/types'
 import type { Projector } from './view'
 
 const START_MARKER_RADIUS_PX = 4
+const START_MARKER_LINE_WIDTH_PX = 1.5
 const ARROW_SIZE_PX = 5
 const PEN_LIFT_COLOR = '#e04949'
+// FR-24: 開始点◯・方向矢印は常にこの固定色・固定線幅で描く。ペン先の太さ(FR-28)や
+// SVG本来の色(FR-26)の影響を受けない
+const DIRECTION_MARKER_COLOR = '#e04949'
 
 export const GHOST_ALPHA = 0.2
 export const BED_FILL_COLOR = '#ffffff'
-export const STROKE_LINE_WIDTH_PX = 1.5
+// FR-28の「実太さ」トグルがOFFのときの既定線幅。ONのときは呼び出し側がペン先の太さ(mm)を
+// view.scaleでpx換算した値をdrawSegmentStroke等へ渡す
+export const STROKE_LINE_WIDTH_PX = 1
 // FR-43: ホバーと選択(クリック)で色を変え、どちらの操作による強調かを区別できるようにする
 export const HOVER_HIGHLIGHT_COLOR = '#ff9500'
 export const SELECTED_HIGHLIGHT_COLOR = '#0a84ff'
-// 実線と同じ太さで上書きするだけにし、線が太くなったように見えないようにする
-export const HIGHLIGHT_LINE_WIDTH = STROKE_LINE_WIDTH_PX
 
-/** FR-24: 開始点の◯表示 */
+/** FR-24: 開始点の◯表示。色・線幅は常に固定(DIRECTION_MARKER_COLOR/START_MARKER_LINE_WIDTH_PX) */
 function drawStartMarker(ctx: CanvasRenderingContext2D, at: Point): void {
+  ctx.strokeStyle = DIRECTION_MARKER_COLOR
+  ctx.lineWidth = START_MARKER_LINE_WIDTH_PX
   ctx.beginPath()
   ctx.arc(at.x, at.y, START_MARKER_RADIUS_PX, 0, Math.PI * 2)
   ctx.stroke()
@@ -68,16 +74,22 @@ function appendSegmentPath(
   }
 }
 
-/** 1本のセグメントを実線で描画し、開始点の画面座標を返す */
+/**
+ * 1本のセグメントを実線で描画し、開始点の画面座標を返す。
+ * colorOverrideが指定された場合はSVG本来の色(FR-26)より優先する
+ * (ペン先の太さが入力されている間は、Phase7(ペン分割)前の単一ペン前提として黒で統一するため)
+ */
 export function drawSegmentStroke(
   ctx: CanvasRenderingContext2D,
   segment: PreviewSegment,
   projector: Projector,
   defaultColor: string,
+  lineWidthPx: number = STROKE_LINE_WIDTH_PX,
+  colorOverride?: string,
 ): Point | null {
   if (segment.points.length < 2) return null
-  ctx.strokeStyle = segment.color || defaultColor
-  ctx.lineWidth = STROKE_LINE_WIDTH_PX
+  ctx.strokeStyle = colorOverride || segment.color || defaultColor
+  ctx.lineWidth = lineWidthPx
   ctx.beginPath()
   appendSegmentPath(ctx, segment, projector)
   ctx.stroke()
@@ -85,15 +97,17 @@ export function drawSegmentStroke(
   return { x: projector.toX(p0), y: projector.toY(p0) }
 }
 
-/** FR-24: 1本のセグメントの開始点◯と描画方向の矢印 */
+/**
+ * FR-24: 1本のセグメントの開始点◯と描画方向の矢印。常に固定色(赤)で描き、
+ * SVG本来の色(FR-26)・ペン先の太さ(FR-28)のいずれの影響も受けない
+ */
 export function drawSegmentDirection(
   ctx: CanvasRenderingContext2D,
   segment: PreviewSegment,
   start: Point,
   projector: Projector,
-  defaultColor: string,
 ): void {
-  ctx.fillStyle = segment.color || defaultColor
+  ctx.fillStyle = DIRECTION_MARKER_COLOR
   drawStartMarker(ctx, start)
   drawDirectionArrow(ctx, start, {
     x: projector.toX(segment.points[1]),
@@ -102,7 +116,8 @@ export function drawSegmentDirection(
 }
 
 /**
- * FR-43: ハイライト対象の範囲[start, end)を、実色より太い単色の線で上書き描画する。
+ * FR-43: ハイライト対象の範囲[start, end)を単色で上書き描画する。線が太くなったように
+ * 見えないよう、lineWidthPxは実線と同じ太さ(FR-28の実太さ表示中はその太さ)を渡す想定。
  * 単色なので、範囲全体を1つのパスにまとめてstrokeは1回だけ呼ぶ
  * (ハッチ線が数千本ある塗りブロックをハイライトしたときのコストを抑える)
  */
@@ -112,11 +127,13 @@ export function drawHighlightRange(
   range: HighlightRange | null,
   color: string,
   projector: Projector,
+  lineWidthPx: number = STROKE_LINE_WIDTH_PX,
 ): void {
   if (!range) return
   const from = Math.max(0, range.start)
   const to = Math.min(range.end, segments.length)
   ctx.strokeStyle = color
+  ctx.lineWidth = lineWidthPx
   ctx.beginPath()
   for (let i = from; i < to; i++) {
     const segment = segments[i]

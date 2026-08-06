@@ -19,6 +19,9 @@ interface SettingsPanelProps {
   /** FR-14: 端点結合距離(mm) */
   joinDistanceMm: number
   onJoinDistanceChange: (joinDistanceMm: number) => void
+  /** ペン先の太さ(mm)。0=未入力 */
+  penWidthMm: number
+  onPenWidthChange: (penWidthMm: number) => void
   onJoinPaths: () => void
   onOptimize: () => void
   onResetAll: () => void
@@ -41,6 +44,8 @@ export function SettingsPanel({
   onGcodeInvalidChange,
   joinDistanceMm,
   onJoinDistanceChange,
+  penWidthMm,
+  onPenWidthChange,
   onJoinPaths,
   onOptimize,
   onResetAll,
@@ -146,6 +151,24 @@ export function SettingsPanel({
                   )
                 }
               />
+            </div>
+
+            <div className="settings-group">
+              <h3>ペン設定</h3>
+              <NumberField
+                label="ペン先の太さ(mm)"
+                value={penWidthMm}
+                min={0}
+                step={0.1}
+                onCommit={onPenWidthChange}
+                onValidityChange={(valid) =>
+                  setValidity('penWidthMm', 'ペン先の太さ', valid)
+                }
+              />
+              <p className="settings-hint">
+                0の場合は未入力として扱われます。変更した瞬間に、結合距離・塗りの線間隔・
+                塗りオフセットへ一度だけ反映されます(以降はそれぞれ個別に編集できます)
+              </p>
             </div>
 
             <div className="settings-group">

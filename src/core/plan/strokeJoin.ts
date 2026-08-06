@@ -4,8 +4,9 @@ import type { ParsedStroke } from '../svg/types'
 import type { BlockMember, JoinedBlock } from './types'
 
 /**
- * FR-14: 結合距離の既定値。本来はペン線幅から算出するが、ペン(レイヤー)概念導入(Phase7)前は
- * 常にフォールバック値の0.5mmを既定とする
+ * FR-14: 結合距離の初期値。「ペン設定」でペン先の太さが入力されると、変更された瞬間に
+ * その値へ一度だけ更新される(App.tsxのhandlePenWidthChange)。太さが未入力のままの場合は
+ * 引き続きこのフォールバック値の0.5mmを既定とする
  */
 export const DEFAULT_JOIN_DISTANCE_MM = 0.5
 
