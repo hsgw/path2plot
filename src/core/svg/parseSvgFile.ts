@@ -1,5 +1,5 @@
 import type { Matrix2D } from '../geometry/types'
-import { multiply } from '../geometry/matrix'
+import { multiply, translate } from '../geometry/matrix'
 import type { FillCandidate } from '../fill/types'
 import type {
   ParseSettings,
@@ -189,7 +189,10 @@ export function parseSvgFile(
   const svgEl = doc.documentElement
   const viewBox = parseViewBox(svgEl)
   const scale = computeScaleMmPerUnit(settings.dpi, settings.scaleFactor)
-  const printerMatrix = svgToPrinterMatrix(viewBox, scale)
+  const printerMatrix = multiply(
+    translate(settings.offsetXMm, settings.offsetYMm),
+    svgToPrinterMatrix(viewBox, scale),
+  )
 
   const ctx: WalkContext = {
     registry: buildDefinitionRegistry(doc),

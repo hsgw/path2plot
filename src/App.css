@@ -134,6 +134,13 @@ label.settings-checkbox-label {
   margin: 0 0 4px;
 }
 
+/* グループ内で見出しを分割する場合の小見出し。同じグループ内では
+   親のflex gap(8px)しか上に空かず、グループ先頭の見出し(グループ間の
+   margin-bottom:16pxで区切られる)より詰まって見えるため、8px追加して揃える */
+.settings-group h3.settings-subheading {
+  margin-top: 8px;
+}
+
 /* 設定項目のラベルテキストと補足説明(InfoHint)を同じ行に並べるための行コンテナ */
 .field-label {
   display: inline-flex;
@@ -307,6 +314,26 @@ label.settings-checkbox-label {
   margin-bottom: 4px;
   word-break: break-word;
   color: var(--error-text);
+}
+
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: rgb(0 0 0 / 35%);
+}
+
+.drop-overlay p {
+  padding: 20px 32px;
+  background: var(--bg);
+  border: 2px dashed var(--text-h);
+  border-radius: 8px;
+  font-size: 16px;
+  color: var(--text);
 }
 
 .processing-overlay-backdrop {

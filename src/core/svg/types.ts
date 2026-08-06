@@ -37,6 +37,10 @@ export interface ParseSettings {
   scaleFactor: number
   /** ベジェ曲線折線化の許容誤差(mm) */
   bezierToleranceMm: number
+  /** 配置位置のXオフセット(mm、プリンタ座標系に対する平行移動) */
+  offsetXMm: number
+  /** 配置位置のYオフセット(mm、プリンタ座標系に対する平行移動) */
+  offsetYMm: number
 }
 
 export const DEFAULT_PARSE_SETTINGS: ParseSettings = {
@@ -44,6 +48,8 @@ export const DEFAULT_PARSE_SETTINGS: ParseSettings = {
   dpi: 72,
   scaleFactor: 1,
   bezierToleranceMm: 0.1,
+  offsetXMm: 0,
+  offsetYMm: 0,
 }
 
 export interface ParsedStroke {

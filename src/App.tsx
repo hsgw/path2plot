@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useMemo, useState } from 'react'
+import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { downloadTextFile, gcodeFileNameFor } from './app/downloadFile'
 import { loadDefaultSettingsPreset } from './app/settingsStorage'
@@ -39,6 +39,10 @@ function App() {
   const [svgText, setSvgText] = useState<string | null>(null)
   const [fileName, setFileName] = useState<string | null>(null)
   const [loadId, setLoadId] = useState(0)
+  // ドラッグ&ドロップでのSVG読み込み。子要素をまたぐdragenter/dragleaveの出入りで
+  // オーバーレイがちらつかないよう、ネスト深さをカウンタで数える
+  const [isDraggingFile, setIsDraggingFile] = useState(false)
+  const dragCounterRef = useRef(0)
   // 起動時、デフォルトとして保存された設定プリセットがあれば自動的に読み込む
   const [settings, setSettings] = useState<ParseSettings>(
     () => loadDefaultSettingsPreset()?.parseSettings ?? DEFAULT_PARSE_SETTINGS,
@@ -197,6 +201,44 @@ function App() {
     setJoinOverrides((prev) => (prev.size === 0 ? prev : EMPTY_JOIN_OVERRIDES))
     setFillOverrides((prev) => (prev.size === 0 ? prev : EMPTY_FILL_OVERRIDES))
   }, [])
+  const isSvgFile = (file: File): boolean =>
+    file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')
+  const handleDragEnter = useCallback(
+    (e: React.DragEvent<HTMLDivElement>): void => {
+      if (!e.dataTransfer.types.includes('Files')) return
+      e.preventDefault()
+      dragCounterRef.current += 1
+      setIsDraggingFile(true)
+    },
+    [],
+  )
+  const handleDragOver = useCallback(
+    (e: React.DragEvent<HTMLDivElement>): void => {
+      if (!e.dataTransfer.types.includes('Files')) return
+      e.preventDefault()
+    },
+    [],
+  )
+  const handleDragLeave = useCallback(
+    (e: React.DragEvent<HTMLDivElement>): void => {
+      if (!e.dataTransfer.types.includes('Files')) return
+      e.preventDefault()
+      dragCounterRef.current = Math.max(0, dragCounterRef.current - 1)
+      if (dragCounterRef.current === 0) setIsDraggingFile(false)
+    },
+    [],
+  )
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>): void => {
+      e.preventDefault()
+      dragCounterRef.current = 0
+      setIsDraggingFile(false)
+      const file = e.dataTransfer.files[0]
+      if (!file || !isSvgFile(file)) return
+      file.text().then((text) => handleFileSelected(text, file.name))
+    },
+    [handleFileSelected],
+  )
   // ペン先の太さが変更された瞬間だけ、結合距離・線間隔・塗りオフセットへ一度だけ反映する
   // (以降はそれぞれ個別に自由編集でき、太さ側の変更を継続的に追従しない)
   const handlePenWidthChange = useCallback((next: number): void => {
@@ -271,7 +313,18 @@ function App() {
   const deferredStep = useDeferredValue(playback.step)
 
   return (
-    <div className="app-shell">
+    <div
+      className="app-shell"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDraggingFile && (
+        <div className="drop-overlay">
+          <p>SVGをドロップして読み込み</p>
+        </div>
+      )}
       <ProcessingOverlay
         isProcessing={processing.isProcessing}
         phase={processing.phase}

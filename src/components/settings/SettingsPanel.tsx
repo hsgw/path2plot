@@ -4,6 +4,7 @@ import type { FillSettings } from '../../core/fill/types'
 import type { GcodeSettings } from '../../core/gcode/types'
 import type { ParseSettings } from '../../core/svg/types'
 import { HelpDialog } from '../common/HelpDialog'
+import { InfoHint } from '../common/InfoHint'
 import { NumberField } from '../common/NumberField'
 import { FillSettingsPanel } from './FillSettingsPanel'
 import { GcodeSettingsPanel } from './GcodeSettingsPanel'
@@ -141,6 +142,33 @@ export function SettingsPanel({
               }
               onValidityChange={(valid) =>
                 setValidity('scaleFactor', '倍率', valid)
+              }
+            />
+            <h3 className="settings-subheading">
+              <InfoHint text="読み込んだSVG全体の配置位置をプリンタ座標系上でX/Y方向にずらす">
+                配置オフセット
+              </InfoHint>
+            </h3>
+            <NumberField
+              label="X(mm)"
+              value={settings.offsetXMm}
+              step={1}
+              onCommit={(offsetXMm) =>
+                onSettingsChange({ ...settings, offsetXMm })
+              }
+              onValidityChange={(valid) =>
+                setValidity('offsetXMm', '配置オフセットX', valid)
+              }
+            />
+            <NumberField
+              label="Y(mm)"
+              value={settings.offsetYMm}
+              step={1}
+              onCommit={(offsetYMm) =>
+                onSettingsChange({ ...settings, offsetYMm })
+              }
+              onValidityChange={(valid) =>
+                setValidity('offsetYMm', '配置オフセットY', valid)
               }
             />
             <NumberField
