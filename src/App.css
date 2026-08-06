@@ -429,6 +429,11 @@ label.settings-checkbox-label {
   gap: 6px;
 }
 
+.preview-toggle-group-label {
+  font-size: 12px;
+  color: var(--text);
+}
+
 .preview-toggle-active {
   background: var(--highlight-selected-bar, #0a84ff);
   color: #fff;
@@ -590,6 +595,17 @@ label.settings-checkbox-label {
 
 .settings-actions button {
   width: 100%;
+}
+
+/* 保存/読込・SVG読込/リセット・パス結合/最適化を横2列で並べる行 */
+.settings-actions-row {
+  display: flex;
+  gap: 6px;
+}
+
+.settings-actions-row button {
+  width: auto;
+  flex: 1 1 0;
 }
 
 /* FR-14: ストロークリストの右クリックメニュー(結合/未結合の切り替え)。

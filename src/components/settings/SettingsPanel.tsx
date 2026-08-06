@@ -1,5 +1,9 @@
 import { useState } from 'react'
-import type { SettingsBundle } from '../../app/settingsStorage'
+import {
+  getShowHelpOnStartup,
+  setShowHelpOnStartup,
+  type SettingsBundle,
+} from '../../app/settingsStorage'
 import type { FillSettings } from '../../core/fill/types'
 import type { GcodeSettings } from '../../core/gcode/types'
 import type { ParseSettings } from '../../core/svg/types'
@@ -70,7 +74,10 @@ export function SettingsPanel({
   // 非表示側のタブもDOM上には残す(hidden属性)ことで、入力途中の値や不正値の報告状態が
   // タブ切り替えでリセットされないようにする
   const [activeTab, setActiveTab] = useState<'svg' | 'gcode'>('svg')
-  const [isHelpOpen, setIsHelpOpen] = useState(false)
+  // 「起動時にこのポップアップを表示する」がオンの間、起動時に自動で開く
+  const [isHelpOpen, setIsHelpOpen] = useState(getShowHelpOnStartup)
+  const [showHelpOnStartup, setShowHelpOnStartupState] =
+    useState(getShowHelpOnStartup)
   const { setValidity } = useInvalidFields(onSettingsInvalidChange)
 
   return (
@@ -81,7 +88,16 @@ export function SettingsPanel({
           使い方
         </button>
       </div>
-      {isHelpOpen && <HelpDialog onClose={() => setIsHelpOpen(false)} />}
+      {isHelpOpen && (
+        <HelpDialog
+          onClose={() => setIsHelpOpen(false)}
+          showOnStartup={showHelpOnStartup}
+          onShowOnStartupChange={(value) => {
+            setShowHelpOnStartupState(value)
+            setShowHelpOnStartup(value)
+          }}
+        />
+      )}
       <div className="panel-body panel-body-settings">
         <SettingsActions
           onFileSelected={onFileSelected}

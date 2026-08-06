@@ -47,6 +47,7 @@ export function PreviewHeader({
       </div>
       <div className="preview-controls">
         <div className="preview-toggle-group">
+          <span className="preview-toggle-group-label">表示</span>
           <button
             type="button"
             className={showDirection ? 'preview-toggle-active' : undefined}

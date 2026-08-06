@@ -89,3 +89,27 @@ export function deleteSettingsPreset(name: string): void {
   if (store.defaultName === name) store.defaultName = null
   writeStore(store)
 }
+
+const SHOW_HELP_ON_STARTUP_KEY = 'path2plot.showHelpOnStartup'
+
+/**
+ * 「使い方」ポップアップの「起動時にこのポップアップを表示する」チェックボックスの状態。
+ * 起動時にこのポップアップを自動表示するかどうかはこの値のみで判断する(初回判定はしない)。
+ * 未設定(初回)の場合は表示する
+ */
+export function getShowHelpOnStartup(): boolean {
+  try {
+    return localStorage.getItem(SHOW_HELP_ON_STARTUP_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+
+export function setShowHelpOnStartup(value: boolean): void {
+  try {
+    if (value) localStorage.removeItem(SHOW_HELP_ON_STARTUP_KEY)
+    else localStorage.setItem(SHOW_HELP_ON_STARTUP_KEY, '0')
+  } catch {
+    // 保存先(localStorage)が使えない環境(プライベートブラウズ等)では無視する
+  }
+}

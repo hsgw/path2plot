@@ -66,7 +66,7 @@ export function SettingsActions({
     // (`.settings-actions button`等)、.settings-actionsの外側の兄弟として描画する
     <>
       <div className="settings-actions">
-        <div className="settings-actions-group">
+        <div className="settings-actions-row">
           <button type="button" onClick={() => setIsSaveOpen(true)}>
             設定を保存
           </button>
@@ -83,23 +83,27 @@ export function SettingsActions({
             className="settings-file-input-hidden"
             onChange={handleFileChange}
           />
-          <button type="button" onClick={() => fileInputRef.current?.click()}>
-            SVG読み込み
-          </button>
-          <button
-            type="button"
-            onClick={onJoinPaths}
-            disabled={!hasEntries}
-            title="端点が近いストローク同士を結合ブロック化する(読込直後は未実行)"
-          >
-            パス結合
-          </button>
-          <button type="button" onClick={onOptimize} disabled={!hasEntries}>
-            最適化
-          </button>
-          <button type="button" onClick={() => setIsResetConfirmOpen(true)}>
-            リセット
-          </button>
+          <div className="settings-actions-row">
+            <button type="button" onClick={() => fileInputRef.current?.click()}>
+              SVG読み込み
+            </button>
+            <button type="button" onClick={() => setIsResetConfirmOpen(true)}>
+              リセット
+            </button>
+          </div>
+          <div className="settings-actions-row">
+            <button
+              type="button"
+              onClick={onJoinPaths}
+              disabled={!hasEntries}
+              title="端点が近いストローク同士を結合ブロック化する(読込直後は未実行)"
+            >
+              パス結合
+            </button>
+            <button type="button" onClick={onOptimize} disabled={!hasEntries}>
+              最適化
+            </button>
+          </div>
         </div>
 
         <div className="settings-actions-group">

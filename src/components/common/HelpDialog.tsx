@@ -3,9 +3,15 @@ import { XMarkIcon } from './icons'
 
 interface HelpDialogProps {
   onClose: () => void
+  showOnStartup: boolean
+  onShowOnStartupChange: (value: boolean) => void
 }
 
-export function HelpDialog({ onClose }: HelpDialogProps) {
+export function HelpDialog({
+  onClose,
+  showOnStartup,
+  onShowOnStartupChange,
+}: HelpDialogProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onClose()
@@ -107,6 +113,15 @@ export function HelpDialog({ onClose }: HelpDialogProps) {
             </li>
           </ul>
         </section>
+
+        <label className="settings-checkbox-label">
+          <input
+            type="checkbox"
+            checked={showOnStartup}
+            onChange={(e) => onShowOnStartupChange(e.target.checked)}
+          />
+          起動時にこのポップアップを表示する
+        </label>
       </div>
     </div>
   )

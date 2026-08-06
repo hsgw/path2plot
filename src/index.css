@@ -46,3 +46,22 @@ h2 {
   color: var(--text-h);
   margin: 0;
 }
+
+/* ボタンの基本スタイル。個別クラス(.settings-tab等)は border/padding等を
+   明示的に上書きして見た目を変える前提のため、ここでは全ボタン共通の見た目のみ定義する */
+button {
+  font: inherit;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled):not(.preview-toggle-active) {
+  border-color: var(--text-h);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
