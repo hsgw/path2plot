@@ -9,10 +9,12 @@ export interface BedSize {
   heightMm: number
 }
 
-/** FR-38: 描画可能領域からはみ出したストローク1本分の警告 */
+/** FR-38: 描画可能領域からはみ出したストローク/塗り候補1件分の警告 */
 export interface OutOfBoundsWarning {
-  strokeIndex: number
-  strokeId: string
+  kind: 'stroke' | 'fill'
+  /** kind内での出現順index */
+  index: number
+  id: string
   sourceId?: string
   /** はみ出した点 */
   points: Point[]

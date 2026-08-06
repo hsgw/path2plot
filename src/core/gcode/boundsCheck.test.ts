@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import type { FillCandidate } from '../fill/types'
 import type { ParsedStroke } from '../svg/types'
-import { checkStrokeBounds, isPointOutOfBounds } from './boundsCheck'
+import {
+  checkFillCandidateBounds,
+  checkStrokeBounds,
+  isPointOutOfBounds,
+} from './boundsCheck'
 
 const bed = { widthMm: 170, heightMm: 170 }
 
@@ -59,8 +64,50 @@ describe('checkStrokeBounds', () => {
     ]
     const warnings = checkStrokeBounds(strokes, bed)
     expect(warnings).toHaveLength(1)
-    expect(warnings[0].strokeId).toBe('s1')
+    expect(warnings[0].kind).toBe('stroke')
+    expect(warnings[0].id).toBe('s1')
     expect(warnings[0].sourceId).toBe('rect1')
     expect(warnings[0].points).toEqual([{ x: 250, y: 250 }])
+  })
+})
+
+describe('checkFillCandidateBounds', () => {
+  it('strokeを持たずfillのみが可視な要素も、輪郭が範囲外なら検出する', () => {
+    const candidates: FillCandidate[] = [
+      {
+        id: 'fill-0',
+        sourceId: 'rect1',
+        fillColor: '#000',
+        fillRule: 'nonzero',
+        contours: [
+          [
+            { x: 0, y: 0 },
+            { x: 250, y: 250 },
+            { x: 250, y: 0 },
+          ],
+        ],
+      },
+      {
+        id: 'fill-1',
+        fillColor: '#000',
+        fillRule: 'nonzero',
+        contours: [
+          [
+            { x: 10, y: 10 },
+            { x: 20, y: 20 },
+            { x: 20, y: 10 },
+          ],
+        ],
+      },
+    ]
+    const warnings = checkFillCandidateBounds(candidates, bed)
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0].kind).toBe('fill')
+    expect(warnings[0].id).toBe('fill-0')
+    expect(warnings[0].sourceId).toBe('rect1')
+    expect(warnings[0].points).toEqual([
+      { x: 250, y: 250 },
+      { x: 250, y: 0 },
+    ])
   })
 })

@@ -4,7 +4,9 @@ import { AlertBanner } from './AlertBanner'
 function describeWarning(w: OutOfBoundsWarning): string {
   const target = w.sourceId
     ? `id="${w.sourceId}"`
-    : `出現順${w.strokeIndex + 1}本目`
+    : w.kind === 'fill'
+      ? `塗り出現順${w.index + 1}件目`
+      : `出現順${w.index + 1}本目`
   return `${target} が描画可能領域からはみ出しています(${w.points.length}点)`
 }
 

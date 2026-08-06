@@ -314,6 +314,10 @@ M2                                 ; プログラム終了
   - 確定時の値が不正(空・非数値・min未満)な場合は親のstate(`ParseSettings`/`GcodeSettings`)へは反映しない(=プレビュー・G-code生成に使われる値は直前の正常値のまま据え置かれる)。入力欄自体は不正な内容のまま表示され続け、赤枠(`.number-field-invalid`)で視覚的に示す
   - 不正な項目のラベルは`SettingsPanel`/`GcodeSettingsPanel`それぞれでローカル集計し、`App.tsx`で結合して新規`InvalidInputBanner`(画面上部、`ErrorBanner`/`BoundsWarningBanner`と同様常時表示)に一覧表示する。1件以上不正な項目があるあいだはG-codeダウンロードボタンを無効化する(`canDownloadGcode`の条件に追加)
   - Playwrightで、DPI欄を空にしてもフォーカス中はダウンロードがブロックされない(入力途中は許容)こと、フォーカスを外すと不正入力バナー表示・赤枠表示・ダウンロード無効化されること、正しい値に修正すると即座に解消されること、min制約(DPI<1等)違反も同様に確定時にブロックされることを確認済み
+- **不具合修正(2026-08-07、はみ出し警告が出ないケースの調査で発覚)**: `stroke="none"`等でstroke非表示・fillのみ可視な図形が描画可能領域外に配置されていても、はみ出し警告が一切出ずG-codeをダウンロードできてしまう不具合があった
+  - 原因: `parseSvgFile.ts`の`emitShape`は`isStrokeVisible(state)`がtrueの要素のみを`ParsedStroke[]`(`strokes`)に追加しており、fill専用要素は`fillCandidates`にしか追加されない。一方`checkStrokeBounds`(FR-38)は`strokes`のみを走査していたため、fill専用要素はチェック対象から漏れていた。実際のG-code出力(`plan.drawGroups`)にはfillBlock由来の輪郭線・ハッチ線も含まれるため、範囲外のまま出力される実害があった
+  - 修正: `boundsCheck.ts`に`checkFillCandidateBounds`を追加し、`FillCandidate.contours`の輪郭点もチェック対象に含めた(塗り生成後のハッチ線・オフセット線は輪郭の内側に収まる想定のため、fill生成前の輪郭点のみのチェックで足りる、かつWorker側のfill生成完了を待たずに済む)。`OutOfBoundsWarning`型を`strokeIndex`/`strokeId`から`kind: 'stroke' | 'fill'`・`index`・`id`を持つ形に汎用化し、`App.tsx`で`checkStrokeBounds`と`checkFillCandidateBounds`両方の結果をマージするよう変更。`BoundsWarningBanner`の文言もfill用の表記(「塗り出現順N件目」)を追加
+  - テスト: `boundsCheck.test.ts`に`checkFillCandidateBounds`のテストケース(strokeなしfill専用要素の範囲外検出)を追加(vitest全200件通過、`tsc --noEmit`も通過)。Playwrightでのブラウザ目視確認は本セッションでは環境上の制約(プレビュー未接続)により未実施
 
 ---
 

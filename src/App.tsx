@@ -20,7 +20,10 @@ import { StrokeListPanel } from './components/strokeList/StrokeListPanel'
 import { describeFillPattern } from './core/fill/label'
 import { resolveEffectiveFillSettings } from './core/fill/overrides'
 import { DEFAULT_FILL_SETTINGS, type FillSettings } from './core/fill/types'
-import { checkStrokeBounds } from './core/gcode/boundsCheck'
+import {
+  checkFillCandidateBounds,
+  checkStrokeBounds,
+} from './core/gcode/boundsCheck'
 import { generateGcode } from './core/gcode/generate'
 import { DEFAULT_GCODE_SETTINGS } from './core/gcode/types'
 import { buildDrawPlan } from './core/plan/drawPlan'
@@ -268,15 +271,23 @@ function App() {
     })
   }, [])
 
-  // FR-38/NFR-3: 描画可能領域からのはみ出し検出。解消するまでG-codeのダウンロードをブロックする
-  const boundsWarnings = useMemo(
-    () =>
-      checkStrokeBounds(strokes, {
-        widthMm: gcodeSettings.bedWidthMm,
-        heightMm: gcodeSettings.bedHeightMm,
-      }),
-    [strokes, gcodeSettings.bedWidthMm, gcodeSettings.bedHeightMm],
-  )
+  // FR-38/NFR-3: 描画可能領域からのはみ出し検出。解消するまでG-codeのダウンロードをブロックする。
+  // strokeを持たずfillのみが可視な要素はstrokesに現れないため、fillCandidatesも別途チェックする
+  const boundsWarnings = useMemo(() => {
+    const bed = {
+      widthMm: gcodeSettings.bedWidthMm,
+      heightMm: gcodeSettings.bedHeightMm,
+    }
+    return [
+      ...checkStrokeBounds(strokes, bed),
+      ...checkFillCandidateBounds(parseResult?.fillCandidates ?? [], bed),
+    ]
+  }, [
+    strokes,
+    parseResult,
+    gcodeSettings.bedWidthMm,
+    gcodeSettings.bedHeightMm,
+  ])
   const canDownloadGcode =
     plan.drawGroups.length > 0 &&
     boundsWarnings.length === 0 &&
