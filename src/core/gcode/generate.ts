@@ -21,20 +21,29 @@ function toMachinePoint(p: Point, settings: GcodeSettings): Point {
 }
 
 /**
+ * テンプレート展開用の変数一式を作る(FR-32)。GcodeSettingsの数値項目(templatesを除く)を
+ * キー名そのままの変数として全テンプレート共通で使えるようにする(テンプレート間で同名変数が
+ * 異なる値を指すことを避けるため)。
+ */
+function buildTemplateVars(settings: GcodeSettings): Record<string, number> {
+  const { templates: _templates, ...vars } = settings
+  return vars
+}
+
+/**
  * 単一ペン前提(ペン分割なし)で、結合ブロック(FR-14)単位でG-codeを生成する(FR-29)。
- * 各グループは移動(G00)→ペンダウン(テンプレート)→描画(G01、グループ内は結合されペンを上げない)→
- * ペンアップ(テンプレート)の順で出力し、最小セグメント長(FR-34)による間引きを行う。
- * 開始・終了ブロックはテンプレートから展開する(FR-30)。
+ * 各グループは移動(travelMoveテンプレート)→ペンダウン(テンプレート)→描画(drawMoveテンプレート、
+ * グループ内は結合されペンを上げない)→ペンアップ(テンプレート)の順で出力し、最小セグメント長
+ * (FR-34)による間引きを行う。開始・終了ブロックもテンプレートから展開する(FR-30)。
  */
 export function generateGcode(
   groups: DrawGroup[],
   settings: GcodeSettings,
 ): string {
   const lines: string[] = []
+  const templateVars = buildTemplateVars(settings)
 
-  lines.push(
-    renderGcodeTemplate(settings.templates.start, { z: settings.travelZ }),
-  )
+  lines.push(renderGcodeTemplate(settings.templates.start, templateVars))
 
   for (const group of groups) {
     const points = filterMinSegmentLength(group, settings.minSegmentLengthMm)
@@ -43,35 +52,27 @@ export function generateGcode(
     const [first, ...rest] = points
     const firstMachine = toMachinePoint(first, settings)
     lines.push(
-      `G00 X${fmt(firstMachine.x)} Y${fmt(firstMachine.y)} F${fmt(settings.travelFeedRate)}`,
-    )
-    lines.push(
-      renderGcodeTemplate(settings.templates.penDown, {
-        z: settings.penDownZ,
-        f: settings.penFeedRate,
+      renderGcodeTemplate(settings.templates.travelMove, {
+        ...templateVars,
+        x: Number(fmt(firstMachine.x)),
+        y: Number(fmt(firstMachine.y)),
       }),
     )
+    lines.push(renderGcodeTemplate(settings.templates.penDown, templateVars))
     for (const p of rest) {
       const pMachine = toMachinePoint(p, settings)
       lines.push(
-        `G01 X${fmt(pMachine.x)} Y${fmt(pMachine.y)} F${fmt(settings.drawFeedRate)}`,
+        renderGcodeTemplate(settings.templates.drawMove, {
+          ...templateVars,
+          x: Number(fmt(pMachine.x)),
+          y: Number(fmt(pMachine.y)),
+        }),
       )
     }
-    lines.push(
-      renderGcodeTemplate(settings.templates.penUp, {
-        z: settings.penUpZ,
-        f: settings.penFeedRate,
-      }),
-    )
+    lines.push(renderGcodeTemplate(settings.templates.penUp, templateVars))
   }
 
-  lines.push(
-    renderGcodeTemplate(settings.templates.end, {
-      x: settings.parkX,
-      y: settings.parkY,
-      f: settings.travelFeedRate,
-    }),
-  )
+  lines.push(renderGcodeTemplate(settings.templates.end, templateVars))
 
   return lines.join('\n') + '\n'
 }

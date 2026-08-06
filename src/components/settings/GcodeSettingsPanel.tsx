@@ -12,23 +12,39 @@ interface GcodeSettingsPanelProps {
 /** テンプレート以外の設定項目(すべて数値)のキー */
 type NumberSettingKey = keyof Omit<GcodeSettings, 'templates'>
 
-const TEMPLATE_LABELS: {
-  key: keyof GcodeTemplates
-  label: string
-  vars: string
-}[] = [
-  { key: 'start', label: '開始', vars: '{z} = トラベルZ' },
-  {
-    key: 'penDown',
-    label: 'ペンダウン',
-    vars: '{z} = ペンダウンZ、{f} = ペン上下速度',
-  },
-  {
-    key: 'penUp',
-    label: 'ペンアップ',
-    vars: '{z} = ペンアップZ、{f} = ペン上下速度',
-  },
-  { key: 'end', label: '終了', vars: '{x}{y} = パーク位置、{f} = 移動速度' },
+const TEMPLATE_LABELS: { key: keyof GcodeTemplates; label: string }[] = [
+  { key: 'start', label: '開始' },
+  { key: 'travelMove', label: '移動' },
+  { key: 'penDown', label: 'ペンダウン' },
+  { key: 'drawMove', label: '描画' },
+  { key: 'penUp', label: 'ペンアップ' },
+  { key: 'end', label: '終了' },
+]
+
+/**
+ * テンプレートで使える変数の一覧。キー名はGcodeSettingsの数値項目名と一致させている
+ * (generate.ts参照)。{x}{y}のみ例外で、移動(G00)/描画(G01)テンプレート限定の移動先座標
+ * (それ以外のテンプレートでは未定義のまま残る)。それ以外は全テンプレート共通で同じ値を指す。
+ */
+const TEMPLATE_VARS: { key: string; label: string }[] = [
+  { key: 'x', label: '移動先X(移動/描画のみ)' },
+  { key: 'y', label: '移動先Y(移動/描画のみ)' },
+  { key: 'drawFeedRate', label: '描画速度' },
+  { key: 'travelFeedRate', label: '移動速度' },
+  { key: 'penFeedRate', label: 'ペン上下速度' },
+  { key: 'penDownZ', label: 'ペンダウンZ' },
+  { key: 'penUpZ', label: 'ペンアップZ' },
+  { key: 'travelZ', label: 'トラベルZ' },
+  { key: 'drawAccel', label: '描画加速度' },
+  { key: 'travelAccel', label: '移動加速度' },
+  { key: 'xyJerk', label: 'XYジャーク' },
+  { key: 'minSegmentLengthMm', label: '最小セグメント長' },
+  { key: 'bedWidthMm', label: '描画可能領域 幅' },
+  { key: 'bedHeightMm', label: '描画可能領域 高さ' },
+  { key: 'bedOriginXMm', label: '原点X' },
+  { key: 'bedOriginYMm', label: '原点Y' },
+  { key: 'parkX', label: 'パーク位置X' },
+  { key: 'parkY', label: 'パーク位置Y' },
 ]
 
 export function GcodeSettingsPanel({
@@ -121,10 +137,10 @@ export function GcodeSettingsPanel({
           <summary>テンプレートで使える変数</summary>
           <table className="gcode-template-vars">
             <tbody>
-              {TEMPLATE_LABELS.map(({ key, label, vars }) => (
+              {TEMPLATE_VARS.map(({ key, label }) => (
                 <tr key={key}>
+                  <td>{`{${key}}`}</td>
                   <td>{label}</td>
-                  <td>{vars}</td>
                 </tr>
               ))}
             </tbody>

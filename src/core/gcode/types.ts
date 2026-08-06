@@ -18,15 +18,26 @@ export interface OutOfBoundsWarning {
   points: Point[]
 }
 
+/**
+ * テンプレートgcode本体(FR-30/32)。
+ * 各テンプレートで使える変数は共通で、{@link GcodeSettings}の数値項目(templatesを除く)を
+ * そのままのキー名(例: {travelZ}{penDownZ}{penFeedRate}{parkX}等)で展開する(generate.ts参照)。
+ * どのテンプレートでも同じ変数名は同じ値を指す。デフォルトテンプレートで未使用の変数も展開対象。
+ * さらにtravelMove/drawMoveの2つだけは移動先座標{x}{y}も使える(この2つ以外では未定義)。
+ */
 export interface GcodeTemplates {
-  /** 起動部(FR-30/32)。変数: {z}=トラベルZ */
+  /** 起動部(FR-30/32) */
   start: string
-  /** 終了部(FR-30/32)。変数: {x}{y}=パーク位置、{f}=移動速度。パーク退避Z(参考値80)はFR-32の変数対象外のため直値で記述する */
-  end: string
-  /** ペンダウン(FR-30/32)。変数: {z}=ペンダウンZ、{f}=ペン上下速度 */
+  /** 移動(FR-29/32)。結合ブロックの先頭点への移動(ペンアップ状態)1回分。変数{x}{y}=移動先座標 */
+  travelMove: string
+  /** ペンダウン(FR-30/32) */
   penDown: string
-  /** ペンアップ(FR-30/32)。変数: {z}=ペンアップZ、{f}=ペン上下速度 */
+  /** 描画(FR-29/32)。結合ブロック内の点への移動(ペンダウン状態)1回分。変数{x}{y}=移動先座標 */
+  drawMove: string
+  /** ペンアップ(FR-30/32) */
   penUp: string
+  /** 終了部(FR-30/32)。パーク退避Z(参考値80)はFR-32の変数対象外のため直値で記述する */
+  end: string
 }
 
 export interface GcodeSettings {
@@ -70,10 +81,12 @@ export interface GcodeSettings {
 }
 
 export const DEFAULT_GCODE_TEMPLATES: GcodeTemplates = {
-  start: 'M3\nG21\nG90\nG28 W\nG00 Z{z} F720',
-  end: 'G00 Z80 F720\nG00 X{x} Y{y} F{f}\nM5\nM84\nM2',
-  penDown: 'G00 Z{z} F{f}',
-  penUp: 'G00 Z{z} F{f}',
+  start: 'M3\nG21\nG90\nG28 W\nG00 Z{travelZ} F720',
+  travelMove: 'G00 X{x} Y{y} F{travelFeedRate}',
+  penDown: 'G00 Z{penDownZ} F{penFeedRate}',
+  drawMove: 'G01 X{x} Y{y} F{drawFeedRate}',
+  penUp: 'G00 Z{penUpZ} F{penFeedRate}',
+  end: 'G00 Z80 F720\nG00 X{parkX} Y{parkY} F{travelFeedRate}\nM5\nM84\nM2',
 }
 
 /** vpype.toml準拠+実機確定値(FR-31、reference/implementation-status.md Phase3参照) */
