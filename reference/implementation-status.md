@@ -60,6 +60,12 @@
   - 重複解消: 4ファイルに散っていた `dist()` を `geometry/vector.ts` へ、2ファイルの `EPS_MM=1e-3` を `geometry/tolerance.ts` へ、3つの設定パネルで同型だった不正値集計を `settings/useInvalidFields.ts` へ、4つのバナーの同一マークアップを `banners/AlertBanner.tsx` へ集約。2次→3次ベジェ変換の二重実装も `geometry/bezier.ts` に一本化。`DrawGroup` は中身が `points` だけのラッパーだったため点列そのもの(`Point[]`)に変更
   - App.tsx(642行)は、6つのuseMemoに分かれていたパイプライン導出(materialize→listEntries/previewSegments/セグメント累積和/drawGroups/本数集計)を純粋関数 `core/plan/drawPlan.ts` の `buildDrawPlan` に1パスで集約し、約200行に縮小。これによりテストが無かったこの中核ロジックにユニットテストを追加できた(`drawPlan.test.ts`・`highlight.test.ts`、テスト総数 154→164)
   - 検証: `tsc -b` / `oxlint`(警告0)/ `vitest`(21ファイル164件パス)/ dev サーバー実機確認(fill-multi-hole・near-touching-endpoints・many-strokes・fill-donutの読込、パス結合→最適化→前へ→リセット、最適化後の別ファイル再読込、リストのホバー/選択ハイライト、コンソールエラーなし)
+- **リリース前リファクタリング第2弾(2026-08-07)**: 前回(2026-08-01)のディレクトリ再編後に積み上がった未使用export・重複ロジック・CSSの重複を整理。HTML/未使用CSSクラス/未使用CSS変数/コメントアウトコードは調査の結果既にクリーンだった。
+  - JS/TS: `bezier.ts`の`flattenQuadraticBezier`(未使用、対応テストごと削除)、`plan/drawUnit.ts`の`fillBlockSegments`(同一ファイル内専用のため`export`剥奪)、`svg/coordinateTransform.ts`の`svgToPrinterPoint`(本体を削除しテスト側の検証オラクルとして`coordinateTransform.test.ts`に移設)を整理
+  - 点-線分距離計算が`geometry/polygon.ts`(`distSqToSegment`)と`geometry/bezier.ts`(非exportの`distanceToSegment`)に別々に再実装されていたため、`geometry/vector.ts`に`distanceSqToSegment`/`distanceToSegment`として一本化。`polygon.ts`側は同名`distSqToSegment`を維持しつつ内部で`vector.ts`を呼ぶ形に統一。`gcode/segmentFilter.ts`・`fill/hatch/lines.ts`の`Math.hypot`直書きも`vector.ts`の`distance()`に置換
+  - CSS: `App.css`内でリテラル値のまま重複していたhover背景色・box-shadow・モーダル背景色を`--overlay-backdrop-bg`/`--panel-shadow-sm`/`--panel-shadow-lg`/`--control-hover-bg`の4変数に切り出し(計16箇所を置換)。さらにモーダル背景(`.drop-overlay`/`.processing-overlay-backdrop`/`.help-dialog-backdrop`/`.confirm-dialog-backdrop`)を`.modal-backdrop`、フローティングパネル(`.settings-preset-menu`/`.stroke-context-menu`/`.fill-override-popover`)を`.floating-panel`、メニュー項目(`.settings-preset-menu-item`/`.stroke-context-menu-item`)を`.menu-item-base`という共通クラスに統合し、対応する9コンポーネントのclassNameを修正
+  - `gcode/types.ts`の`drawAccel`/`travelAccel`/`xyJerk`(OQ-8/OQ-11/OQ-12確定待ちの暫定値)は仕様未確定のため今回のスコープ外とした
+  - 検証: `tsc -b` / `oxlint`(警告0)/ `vitest`(23ファイル199件パス)/ `vite build`成功 / devサーバーでの実機確認(使い方ダイアログの`.modal-backdrop`統合、設定プリセットメニューの`.floating-panel`+`.menu-item-base`統合を computed style で確認、CSS変数の解決値も確認)
 
 ---
 

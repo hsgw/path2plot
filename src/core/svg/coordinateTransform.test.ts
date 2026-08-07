@@ -1,10 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import { apply } from '../geometry/matrix'
+import type { Point, ViewBox } from '../geometry/types'
 import {
   computeScaleMmPerUnit,
   svgToPrinterMatrix,
-  svgToPrinterPoint,
 } from './coordinateTransform'
+
+/**
+ * svgToPrinterMatrixの検証オラクル。SVG座標からプリンタ座標への変換式(FR-4)を
+ * 行列を介さず素直に書き下したもので、本体側の実装とは独立に保つ。
+ */
+function svgToPrinterPoint(
+  p: Point,
+  viewBox: ViewBox,
+  scaleMmPerUnit: number,
+): Point {
+  return {
+    x: (p.x - viewBox.minX) * scaleMmPerUnit,
+    y: (viewBox.minY + viewBox.height - p.y) * scaleMmPerUnit,
+  }
+}
 
 describe('computeScaleMmPerUnit', () => {
   it('96dpi・倍率1のとき1px=25.4/96mmになる', () => {

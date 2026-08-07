@@ -92,7 +92,7 @@ function SettingsPresetMenuPanel({
   return createPortal(
     <div
       ref={menuRef}
-      className="settings-preset-menu"
+      className="floating-panel settings-preset-menu"
       role="menu"
       style={{ left: anchor.x, top: anchor.y }}
     >
@@ -103,7 +103,7 @@ function SettingsPresetMenuPanel({
               key={name}
               type="button"
               role="menuitem"
-              className="settings-preset-menu-item"
+              className="menu-item-base settings-preset-menu-item"
               onClick={() => onLoadPreset(name)}
             >
               {name}
@@ -115,7 +115,7 @@ function SettingsPresetMenuPanel({
       <button
         type="button"
         role="menuitem"
-        className="settings-preset-menu-item"
+        className="menu-item-base settings-preset-menu-item"
         onClick={onOpenSaveDialog}
       >
         保存…
@@ -123,7 +123,7 @@ function SettingsPresetMenuPanel({
       <button
         type="button"
         role="menuitem"
-        className="settings-preset-menu-item"
+        className="menu-item-base settings-preset-menu-item"
         onClick={onOpenEditDialog}
       >
         編集…

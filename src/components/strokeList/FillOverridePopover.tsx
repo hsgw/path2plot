@@ -42,7 +42,7 @@ export function FillOverridePopover({
   return (
     <div
       ref={panelRef}
-      className="fill-override-popover"
+      className="floating-panel fill-override-popover"
       role="dialog"
       aria-label="塗り設定の個別編集"
       style={{ left: state.x, top: state.y }}

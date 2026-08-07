@@ -1,5 +1,9 @@
 import type { Point } from './types'
 import { GEOMETRY_EPS_MM } from './tolerance'
+import { distanceSqToSegment as distSqToSegment } from './vector'
+
+/** 点pから線分abまでの距離の2乗(端点でクランプ)。輪郭上の点の位置特定にも使う */
+export { distSqToSegment }
 
 export interface Bounds {
   minX: number
@@ -29,20 +33,6 @@ export function boundsOfPoints(points: Point[]): Bounds {
     if (p.y > maxY) maxY = p.y
   }
   return { minX, maxX, minY, maxY }
-}
-
-/** 点pから線分abまでの距離の2乗(端点でクランプ)。輪郭上の点の位置特定にも使う */
-export function distSqToSegment(p: Point, a: Point, b: Point): number {
-  const dx = b.x - a.x
-  const dy = b.y - a.y
-  const lenSq = dx * dx + dy * dy
-  const t =
-    lenSq === 0
-      ? 0
-      : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq))
-  const cx = a.x + t * dx - p.x
-  const cy = a.y + t * dy - p.y
-  return cx * cx + cy * cy
 }
 
 function crossesProperly(

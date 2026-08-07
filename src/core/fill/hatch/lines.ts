@@ -3,6 +3,7 @@ import type { HatchWaveform } from '../types'
 import { clipOpenLinesToPolygon } from '../clipper'
 import { apply, rotateDeg } from '../../geometry/matrix'
 import { boundsOfPoints } from '../../geometry/polygon'
+import { distance } from '../../geometry/vector'
 
 export interface HatchParams {
   angleDeg: number
@@ -186,7 +187,7 @@ export function flattenHatchRows(rows: HatchRow[]): Point[][] {
 function endpointDistance(points: Point[]): number {
   const a = points[0]
   const b = points.at(-1)!
-  return Math.hypot(b.x - a.x, b.y - a.y)
+  return distance(a, b)
 }
 
 /**

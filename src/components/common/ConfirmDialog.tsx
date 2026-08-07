@@ -30,7 +30,7 @@ export function ConfirmDialog({
 
   return (
     <div
-      className="confirm-dialog-backdrop"
+      className="modal-backdrop confirm-dialog-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget) onCancel()
       }}

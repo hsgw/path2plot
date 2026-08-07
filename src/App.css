@@ -1,3 +1,12 @@
+/* このアプリUI固有の固定トークン。明暗テーマで値が変わらないため、
+   テーマ基底色を持つindex.cssの:rootとは分けてここに置く */
+:root {
+  --overlay-backdrop-bg: rgb(0 0 0 / 35%);
+  --panel-shadow-sm: 0 4px 16px rgb(0 0 0 / 25%);
+  --panel-shadow-lg: 0 8px 24px rgb(0 0 0 / 25%);
+  --control-hover-bg: rgb(10 132 255 / 22%);
+}
+
 .app-shell {
   display: flex;
   flex-direction: column;
@@ -182,7 +191,7 @@ label.settings-checkbox-label {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 4px;
-  box-shadow: 0 4px 16px rgb(0 0 0 / 25%);
+  box-shadow: var(--panel-shadow-sm);
 }
 
 .settings-template-textarea {
@@ -332,15 +341,20 @@ label.settings-checkbox-label {
   color: var(--error-text);
 }
 
-.drop-overlay {
+/* 中央固定のオーバーレイ背景に共通するパターン。position/display/backgroundはここに集約し、
+   z-index等の個別差分は各バックドロップクラス側に残す */
+.modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 100;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: var(--overlay-backdrop-bg);
+}
+
+.drop-overlay {
+  z-index: 100;
   pointer-events: none;
-  background: rgb(0 0 0 / 35%);
 }
 
 .drop-overlay p {
@@ -353,13 +367,7 @@ label.settings-checkbox-label {
 }
 
 .processing-overlay-backdrop {
-  position: fixed;
-  inset: 0;
   z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgb(0 0 0 / 35%);
 }
 
 .processing-overlay {
@@ -372,7 +380,7 @@ label.settings-checkbox-label {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
+  box-shadow: var(--panel-shadow-lg);
   font-size: 13px;
   color: var(--text);
 }
@@ -565,7 +573,7 @@ label.settings-checkbox-label {
 }
 
 .stroke-list-fill-reset:hover {
-  background: rgb(10 132 255 / 22%);
+  background: var(--control-hover-bg);
   color: var(--text-h);
 }
 
@@ -627,38 +635,48 @@ label.settings-checkbox-label {
   white-space: nowrap;
 }
 
-.settings-preset-menu {
+/* 画面上に位置決めして浮かせるパネル(メニュー・ポップオーバー)に共通するコンテナスタイル。
+   幅・内部レイアウト等の個別差分は各クラス側に残す */
+.floating-panel {
   position: fixed;
   z-index: 30;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  box-shadow: var(--panel-shadow-sm);
+}
+
+.settings-preset-menu {
   min-width: 180px;
   max-width: 280px;
   padding: 4px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  box-shadow: 0 4px 16px rgb(0 0 0 / 25%);
 }
 
-.settings-preset-menu-item {
-  width: 100%;
+/* フローティングパネル内のメニュー項目ボタンに共通するスタイル。配置・折り返し等の
+   個別差分は各クラス側に残す */
+.menu-item-base {
   padding: 5px 8px;
   font-size: 12px;
-  text-align: left;
   border: none;
   border-radius: 4px;
   background: none;
   color: var(--text-h);
   cursor: pointer;
+}
+
+.settings-preset-menu-item {
+  width: 100%;
+  text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .settings-preset-menu-item:hover {
-  background: rgb(10 132 255 / 22%);
+  background: var(--control-hover-bg);
 }
 
 .settings-preset-menu-divider {
@@ -681,17 +699,11 @@ label.settings-checkbox-label {
 /* FR-14: ストロークリストの右クリックメニュー(結合/未結合の切り替え)。
    位置は行のクリック位置からJSで確定するため、left/topはインラインスタイルで与える */
 .stroke-context-menu {
-  position: fixed;
-  z-index: 30;
   min-width: 210px;
   padding: 4px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  box-shadow: 0 4px 16px rgb(0 0 0 / 25%);
 }
 
 .stroke-context-menu-header {
@@ -711,18 +723,11 @@ label.settings-checkbox-label {
   justify-content: space-between;
   gap: 8px;
   width: 100%;
-  padding: 5px 8px;
-  font-size: 12px;
   text-align: left;
-  border: none;
-  border-radius: 4px;
-  background: none;
-  color: var(--text-h);
-  cursor: pointer;
 }
 
 .stroke-context-menu-item:hover:not(:disabled) {
-  background: rgb(10 132 255 / 22%);
+  background: var(--control-hover-bg);
 }
 
 .stroke-context-menu-item:disabled {
@@ -744,8 +749,6 @@ label.settings-checkbox-label {
 /* fillの個別設定編集ポップオーバー。位置決め・閉じる挙動はstroke-context-menuと同じ
    useFloatingPanelDismissを使うため、コンテナのスタイルもほぼ流用する */
 .fill-override-popover {
-  position: fixed;
-  z-index: 30;
   width: 320px;
   max-height: 70vh;
   overflow-y: auto;
@@ -753,10 +756,6 @@ label.settings-checkbox-label {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  box-shadow: 0 4px 16px rgb(0 0 0 / 25%);
 }
 
 .fill-override-popover-header {
@@ -781,7 +780,7 @@ label.settings-checkbox-label {
 }
 
 .fill-override-popover-close:hover {
-  background: rgb(10 132 255 / 22%);
+  background: var(--control-hover-bg);
   color: var(--text-h);
 }
 
@@ -812,16 +811,8 @@ label.settings-checkbox-label {
   color: var(--text);
 }
 
-/* 使い方ポップアップ。ProcessingOverlayと同じ中央固定バックドロップ+カードのパターンだが、
-   ユーザー操作で閉じられる点が異なるためクラス名は独立させる */
 .help-dialog-backdrop {
-  position: fixed;
-  inset: 0;
   z-index: 110;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgb(0 0 0 / 35%);
 }
 
 .help-dialog {
@@ -836,7 +827,7 @@ label.settings-checkbox-label {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
+  box-shadow: var(--panel-shadow-lg);
   font-size: 13px;
   color: var(--text);
 }
@@ -860,7 +851,7 @@ label.settings-checkbox-label {
 }
 
 .help-dialog-close:hover {
-  background: rgb(10 132 255 / 22%);
+  background: var(--control-hover-bg);
   color: var(--text-h);
 }
 
@@ -924,13 +915,7 @@ label.settings-checkbox-label {
 
 /* リセット確認・プリセット削除確認などの汎用確認ダイアログ。help-dialogより小さい固定幅カード */
 .confirm-dialog-backdrop {
-  position: fixed;
-  inset: 0;
   z-index: 120;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgb(0 0 0 / 35%);
 }
 
 .confirm-dialog {
@@ -943,7 +928,7 @@ label.settings-checkbox-label {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
+  box-shadow: var(--panel-shadow-lg);
   font-size: 13px;
   color: var(--text);
 }

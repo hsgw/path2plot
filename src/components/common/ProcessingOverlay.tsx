@@ -19,7 +19,7 @@ export function ProcessingOverlay({
   if (!isProcessing) return null
 
   return (
-    <div className="processing-overlay-backdrop">
+    <div className="modal-backdrop processing-overlay-backdrop">
       <div className="processing-overlay" role="status" aria-live="polite">
         <div className="processing-overlay-label">
           {phase ? PHASE_LABELS[phase] : '処理中…'}

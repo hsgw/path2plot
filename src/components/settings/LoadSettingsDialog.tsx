@@ -31,7 +31,7 @@ export function LoadSettingsDialog({
 
   return (
     <div
-      className="help-dialog-backdrop"
+      className="modal-backdrop help-dialog-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}

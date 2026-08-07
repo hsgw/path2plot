@@ -1,20 +1,7 @@
 import type { Point } from './types'
+import { distanceToSegment } from './vector'
 
 const MAX_DEPTH = 24
-
-function distanceToSegment(p: Point, a: Point, b: Point): number {
-  const dx = b.x - a.x
-  const dy = b.y - a.y
-  const lengthSq = dx * dx + dy * dy
-  if (lengthSq === 0) {
-    return Math.hypot(p.x - a.x, p.y - a.y)
-  }
-  const t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSq
-  const clamped = Math.max(0, Math.min(1, t))
-  const projX = a.x + clamped * dx
-  const projY = a.y + clamped * dy
-  return Math.hypot(p.x - projX, p.y - projY)
-}
 
 function isFlatEnough(
   p0: Point,
@@ -117,15 +104,4 @@ export function quadraticToCubicControls(
       y: p2.y + (2 / 3) * (p1.y - p2.y),
     },
   }
-}
-
-/** 2次ベジェ曲線を3次ベジェへ昇次してから折線化する */
-export function flattenQuadraticBezier(
-  p0: Point,
-  p1: Point,
-  p2: Point,
-  tolerance: number,
-): Point[] {
-  const { c1, c2 } = quadraticToCubicControls(p0, p1, p2)
-  return flattenCubicBezier(p0, c1, c2, p2, tolerance)
 }

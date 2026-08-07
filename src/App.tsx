@@ -324,7 +324,7 @@ function App() {
       onDrop={handleDrop}
     >
       {isDraggingFile && (
-        <div className="drop-overlay">
+        <div className="modal-backdrop drop-overlay">
           <p>SVGをドロップして読み込み</p>
         </div>
       )}

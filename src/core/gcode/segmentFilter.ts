@@ -1,3 +1,4 @@
+import { distance } from '../geometry/vector'
 import type { Point } from '../geometry/types'
 
 /**
@@ -14,7 +15,7 @@ export function filterMinSegmentLength(
   for (let i = 1; i < points.length - 1; i++) {
     const last = result[result.length - 1]
     const p = points[i]
-    if (Math.hypot(p.x - last.x, p.y - last.y) >= minLengthMm) {
+    if (distance(p, last) >= minLengthMm) {
       result.push(p)
     }
   }

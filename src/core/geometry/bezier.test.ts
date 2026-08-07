@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Point } from './types'
-import { flattenCubicBezier, flattenQuadraticBezier } from './bezier'
+import { flattenCubicBezier } from './bezier'
 
 function cubicAt(p0: Point, p1: Point, p2: Point, p3: Point, t: number): Point {
   const mt = 1 - t
@@ -81,17 +81,5 @@ describe('flattenCubicBezier', () => {
       const deviation = maxDeviation(p0, p1, p2, p3, polyline)
       expect(deviation).toBeLessThanOrEqual(tolerance * 1.5)
     }
-  })
-})
-
-describe('flattenQuadraticBezier', () => {
-  it('2次ベジェも許容誤差以内に折線化される', () => {
-    const p0: Point = { x: 10, y: 80 }
-    const p1: Point = { x: 50, y: 10 }
-    const p2: Point = { x: 90, y: 80 }
-    const tolerance = 0.1
-    const polyline = flattenQuadraticBezier(p0, p1, p2, tolerance)
-    expect(polyline.length).toBeGreaterThan(1)
-    expect(polyline[polyline.length - 1]).toEqual(p2)
   })
 })

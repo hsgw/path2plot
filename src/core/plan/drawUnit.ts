@@ -21,7 +21,7 @@ export function toDrawUnits(
 }
 
 /** 塗りブロックの物理セグメント列(輪郭線→塗り線の生成順)。内部並び替えの添字はこの並びを指す */
-export function fillBlockSegments(fillBlock: FillBlock): Point[][] {
+function fillBlockSegments(fillBlock: FillBlock): Point[][] {
   return [...(fillBlock.outlineLoops ?? []), ...fillBlock.fillChains]
 }
 

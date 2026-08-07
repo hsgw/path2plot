@@ -76,7 +76,7 @@ function JoinMenuItem({
     <button
       type="button"
       role="menuitem"
-      className="stroke-context-menu-item"
+      className="menu-item-base stroke-context-menu-item"
       disabled={action === null}
       title={
         action === null
@@ -124,7 +124,7 @@ function FillMenuItems({
       <button
         type="button"
         role="menuitem"
-        className="stroke-context-menu-item"
+        className="menu-item-base stroke-context-menu-item"
         onClick={() => {
           onEditFillSettings(entry.id)
           onClose()
@@ -138,7 +138,7 @@ function FillMenuItems({
       <button
         type="button"
         role="menuitem"
-        className="stroke-context-menu-item"
+        className="menu-item-base stroke-context-menu-item"
         disabled={!entry.overridden}
         title={
           entry.overridden
@@ -155,7 +155,7 @@ function FillMenuItems({
       <button
         type="button"
         role="menuitem"
-        className="stroke-context-menu-item"
+        className="menu-item-base stroke-context-menu-item"
         onClick={() => {
           onCopyFillSettings(entry.id)
           onClose()
@@ -166,7 +166,7 @@ function FillMenuItems({
       <button
         type="button"
         role="menuitem"
-        className="stroke-context-menu-item"
+        className="menu-item-base stroke-context-menu-item"
         disabled={!canPaste}
         title={canPaste ? undefined : 'コピー済みの塗り設定がありません'}
         onClick={() => {
@@ -219,7 +219,7 @@ export function StrokeContextMenu({
   return (
     <div
       ref={menuRef}
-      className="stroke-context-menu"
+      className="floating-panel stroke-context-menu"
       role="menu"
       style={{ left: state.x, top: state.y }}
     >
