@@ -17,8 +17,12 @@ export function SaveSettingsDialog({
   onSave,
   onClose,
 }: SaveSettingsDialogProps) {
+  // デフォルトが1件も無い場合、初回保存は常にデフォルト扱いになる(saveSettingsPreset側の仕様)ため固定でチェックする
+  const isFirstSave = defaultName === null
   const [name, setName] = useState(defaultName ?? '')
-  const [asDefault, setAsDefault] = useState(defaultName === null)
+  const [asDefault, setAsDefault] = useState(
+    isFirstSave || name.trim() === defaultName,
+  )
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
@@ -30,6 +34,12 @@ export function SaveSettingsDialog({
 
   const trimmedName = name.trim()
   const willOverwrite = existingNames.includes(trimmedName)
+
+  // 入力中の名前が現在のデフォルト名と一致する間は、デフォルト指定チェックを自動的に追従させる
+  const handleNameChange = (value: string): void => {
+    setName(value)
+    if (!isFirstSave) setAsDefault(value.trim() === defaultName)
+  }
 
   const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault()
@@ -68,7 +78,7 @@ export function SaveSettingsDialog({
               type="text"
               autoFocus
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => handleNameChange(e.target.value)}
             />
           </label>
           {willOverwrite && (
@@ -80,7 +90,7 @@ export function SaveSettingsDialog({
             <input
               type="checkbox"
               checked={asDefault}
-              disabled={defaultName === null}
+              disabled={isFirstSave}
               onChange={(e) => setAsDefault(e.target.checked)}
             />
             起動時に自動で読み込む(デフォルト)

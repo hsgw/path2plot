@@ -1,7 +1,10 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { downloadTextFile, gcodeFileNameFor } from './app/downloadFile'
-import { loadDefaultSettingsPreset } from './app/settingsStorage'
+import {
+  getDefaultSettingsPresetName,
+  loadDefaultSettingsPreset,
+} from './app/settingsStorage'
 import type { SettingsBundle } from './app/settingsStorage'
 import { useHighlightSelection } from './app/useHighlightSelection'
 import {
@@ -70,6 +73,11 @@ function App() {
   // 変更された瞬間だけ結合距離・線間隔・塗りオフセットへ一度反映する(以降は個別に自由編集できる)
   const [penWidthMm, setPenWidthMm] = useState(
     () => loadDefaultSettingsPreset()?.penWidthMm ?? 0,
+  )
+  // 現在読み込んでいる設定プリセット名。起動時のデフォルト読込・ロードダイアログでの読込時に加え、
+  // 保存時も更新する(保存=その名前の設定を読み込んでいる状態とみなす)
+  const [currentSettingsName, setCurrentSettingsName] = useState<string | null>(
+    () => (loadDefaultSettingsPreset() ? getDefaultSettingsPresetName() : null),
   )
 
   // 数値入力欄で不正な値が確定されたまま残っている項目のラベル一覧(パネルごとに集計)
@@ -175,12 +183,13 @@ function App() {
     [settings, gcodeSettings, fillSettings, joinDistanceMm, penWidthMm],
   )
   const handleLoadSettingsBundle = useCallback(
-    (bundle: SettingsBundle): void => {
+    (bundle: SettingsBundle, name: string): void => {
       setSettings(bundle.parseSettings)
       setGcodeSettings(bundle.gcodeSettings)
       setFillSettings(bundle.fillSettings)
       setJoinDistanceMm(bundle.joinDistanceMm)
       setPenWidthMm(bundle.penWidthMm)
+      setCurrentSettingsName(name)
     },
     [],
   )
@@ -351,6 +360,8 @@ function App() {
           onDownloadGcode={handleDownloadGcode}
           settingsBundle={settingsBundle}
           onLoadSettingsBundle={handleLoadSettingsBundle}
+          currentSettingsName={currentSettingsName}
+          onSettingsNameChange={setCurrentSettingsName}
         />
         <PreviewPanel
           fileName={fileName}

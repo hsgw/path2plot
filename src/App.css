@@ -613,6 +613,60 @@ label.settings-checkbox-label {
   width: 100%;
 }
 
+/* 設定プリセットのドロップダウンメニュー。トリガーには現在の設定名を表示する */
+.settings-preset-menu-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.settings-preset-menu-trigger-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-preset-menu {
+  position: fixed;
+  z-index: 30;
+  min-width: 180px;
+  max-width: 280px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 25%);
+}
+
+.settings-preset-menu-item {
+  width: 100%;
+  padding: 5px 8px;
+  font-size: 12px;
+  text-align: left;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-h);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-preset-menu-item:hover {
+  background: rgb(10 132 255 / 22%);
+}
+
+.settings-preset-menu-divider {
+  height: 1px;
+  margin: 2px 4px;
+  background: var(--border);
+}
+
 /* 保存/読込・SVG読込/リセット・パス結合/最適化を横2列で並べる行 */
 .settings-actions-row {
   display: flex;

@@ -11,6 +11,7 @@ import {
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { LoadSettingsDialog } from './LoadSettingsDialog'
 import { SaveSettingsDialog } from './SaveSettingsDialog'
+import { SettingsPresetMenu } from './SettingsPresetMenu'
 
 interface SettingsActionsProps {
   onFileSelected: (text: string, fileName: string) => void
@@ -28,7 +29,11 @@ interface SettingsActionsProps {
   /** 現在の設定一式(保存ダイアログで使う) */
   settingsBundle: SettingsBundle
   /** プリセットをロードした結果を各設定へ反映する */
-  onLoadSettingsBundle: (bundle: SettingsBundle) => void
+  onLoadSettingsBundle: (bundle: SettingsBundle, name: string) => void
+  /** 現在読み込んでいる設定プリセット名(未ロードならnull) */
+  currentSettingsName: string | null
+  /** 保存した設定プリセット名を「現在読み込んでいる設定」として反映する */
+  onSettingsNameChange: (name: string) => void
 }
 
 /** 設定列の先頭に置く操作ボタン群(保存・ロード / 読み込み・並び順操作 / G-code出力) */
@@ -43,6 +48,8 @@ export function SettingsActions({
   onDownloadGcode,
   settingsBundle,
   onLoadSettingsBundle,
+  currentSettingsName,
+  onSettingsNameChange,
 }: SettingsActionsProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isSaveOpen, setIsSaveOpen] = useState(false)
@@ -66,13 +73,17 @@ export function SettingsActions({
     // (`.settings-actions button`等)、.settings-actionsの外側の兄弟として描画する
     <>
       <div className="settings-actions">
-        <div className="settings-actions-row">
-          <button type="button" onClick={() => setIsSaveOpen(true)}>
-            設定を保存
-          </button>
-          <button type="button" onClick={() => setIsLoadOpen(true)}>
-            設定を読み込み
-          </button>
+        <div className="settings-actions-group">
+          <SettingsPresetMenu
+            currentSettingsName={currentSettingsName}
+            presetNames={presetNames}
+            onLoadPreset={(name) => {
+              const bundle = loadSettingsPreset(name)
+              if (bundle) onLoadSettingsBundle(bundle, name)
+            }}
+            onOpenSaveDialog={() => setIsSaveOpen(true)}
+            onOpenEditDialog={() => setIsLoadOpen(true)}
+          />
         </div>
 
         <div className="settings-actions-group">
@@ -130,6 +141,7 @@ export function SettingsActions({
           onSave={(name, asDefault) => {
             saveSettingsPreset(name, settingsBundle, asDefault)
             forceRerender((v) => v + 1)
+            onSettingsNameChange(name)
             setIsSaveOpen(false)
           }}
           onClose={() => setIsSaveOpen(false)}
@@ -142,7 +154,7 @@ export function SettingsActions({
           defaultName={defaultPresetName}
           onLoad={(name) => {
             const bundle = loadSettingsPreset(name)
-            if (bundle) onLoadSettingsBundle(bundle)
+            if (bundle) onLoadSettingsBundle(bundle, name)
             setIsLoadOpen(false)
           }}
           onSetDefault={(name) => {

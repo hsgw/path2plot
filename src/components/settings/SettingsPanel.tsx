@@ -42,7 +42,11 @@ interface SettingsPanelProps {
   /** 現在の設定一式(保存ダイアログで使う) */
   settingsBundle: SettingsBundle
   /** プリセットをロードした結果を各設定へ反映する */
-  onLoadSettingsBundle: (bundle: SettingsBundle) => void
+  onLoadSettingsBundle: (bundle: SettingsBundle, name: string) => void
+  /** 現在読み込んでいる設定プリセット名(未ロードならnull) */
+  currentSettingsName: string | null
+  /** 保存した設定プリセット名を「現在読み込んでいる設定」として反映する */
+  onSettingsNameChange: (name: string) => void
 }
 
 export function SettingsPanel({
@@ -69,6 +73,8 @@ export function SettingsPanel({
   onDownloadGcode,
   settingsBundle,
   onLoadSettingsBundle,
+  currentSettingsName,
+  onSettingsNameChange,
 }: SettingsPanelProps) {
   // 設定項目はSVG読み込み系(読み込み・パス結合・塗りつぶし)とG-code出力系の2タブに分ける。
   // 非表示側のタブもDOM上には残す(hidden属性)ことで、入力途中の値や不正値の報告状態が
@@ -110,6 +116,8 @@ export function SettingsPanel({
           onDownloadGcode={onDownloadGcode}
           settingsBundle={settingsBundle}
           onLoadSettingsBundle={onLoadSettingsBundle}
+          currentSettingsName={currentSettingsName}
+          onSettingsNameChange={onSettingsNameChange}
         />
 
         <div className="settings-tabs" role="tablist">
