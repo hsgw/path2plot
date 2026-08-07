@@ -25,6 +25,10 @@ dist-ssr
 
 # Claude Code local settings
 .claude/settings.local.json
+.claude/launch.json
 
 # 環境依存の絶対パス(グローバルplaywrightの場所等)を含むため共有しない
 .claude/skills/playwright-svg-preview-check/
+
+# 開発中の進捗メモ(ローカルのみで管理)
+reference/implementation-status.md
