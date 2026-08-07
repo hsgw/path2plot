@@ -900,6 +900,18 @@ label.settings-checkbox-label {
   margin: 6px 0 0;
 }
 
+.help-dialog-footer {
+  margin-top: 4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.help-dialog-license-self {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--text);
+}
+
 .help-dialog-license-list {
   list-style: none;
   margin: 0;

@@ -84,11 +84,11 @@ export function HelpDialog({
         </section>
 
         <section className="help-dialog-section">
-          <h3>ライセンス表記</h3>
-          <p>
-            本ソフトウェアはMIT License(© 2026 Takuya Urakawa /
-            5z6p.com)のもとで公開されています。以下は利用している主なライブラリのライセンスです。
+          <h3>ライセンス</h3>
+          <p className="help-dialog-license-self">
+            MIT License(© 2026 Takuya Urakawa / 5z6p.com)
           </p>
+          <p>以下は利用している主なライブラリのライセンスです。</p>
           <ul className="help-dialog-license-list">
             <li>
               <a
@@ -133,14 +133,16 @@ export function HelpDialog({
           </ul>
         </section>
 
-        <label className="settings-checkbox-label">
-          <input
-            type="checkbox"
-            checked={showOnStartup}
-            onChange={(e) => onShowOnStartupChange(e.target.checked)}
-          />
-          起動時にこのポップアップを表示する
-        </label>
+        <div className="help-dialog-footer">
+          <label className="settings-checkbox-label">
+            <input
+              type="checkbox"
+              checked={showOnStartup}
+              onChange={(e) => onShowOnStartupChange(e.target.checked)}
+            />
+            起動時にこのポップアップを表示する
+          </label>
+        </div>
       </div>
     </div>
   )
