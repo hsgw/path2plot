@@ -46,6 +46,39 @@ const INITIAL_PRESETS: Record<string, SettingsBundle> = {
   prusa_pen: createInitialBundle(PRUSA_PEN_GCODE_SETTINGS),
 }
 
+function addInitialPresets(store: SettingsStore): void {
+  // 一度だけ不足分を追加する。既存の同名プリセットとデフォルト選択は保持し、
+  // マーカーでユーザーが削除した初期プリセットを次回以降に復活させない。
+  if (localStorage.getItem(MIGRATION_KEY) !== '1') {
+    for (const [name, bundle] of Object.entries(INITIAL_PRESETS)) {
+      if (!(name in store.presets)) store.presets[name] = bundle
+    }
+    if (!store.defaultName) store.defaultName = 'default'
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(store))
+    localStorage.setItem(MIGRATION_KEY, '1')
+  }
+}
+
+function migrateDefaultFlipY(store: SettingsStore): void {
+  // 既存の default が旧既定値のままなら新しい座標系設定へ移行する。
+  // 他の値が変わっている場合はユーザー編集とみなし、そのまま保持する。
+  if (localStorage.getItem(DEFAULT_FLIP_Y_MIGRATION_KEY) !== '1') {
+    const defaultPreset = store.presets.default
+    const settings = defaultPreset?.gcodeSettings
+    const { flipY: _flipY, ...currentSettings } = DEFAULT_GCODE_SETTINGS
+    const { flipY: previousFlipY, ...previousSettings } = settings ?? {}
+    if (
+      settings &&
+      previousFlipY !== true &&
+      JSON.stringify(previousSettings) === JSON.stringify(currentSettings)
+    ) {
+      settings.flipY = true
+      writeStore(store)
+    }
+    localStorage.setItem(DEFAULT_FLIP_Y_MIGRATION_KEY, '1')
+  }
+}
+
 function readStore(): SettingsStore {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -57,34 +90,8 @@ function readStore(): SettingsStore {
         }
       : { defaultName: null, presets: {} }
 
-    // 一度だけ不足分を追加する。既存の同名プリセットとデフォルト選択は保持し、
-    // マーカーでユーザーが削除した初期プリセットを次回以降に復活させない。
-    if (localStorage.getItem(MIGRATION_KEY) !== '1') {
-      for (const [name, bundle] of Object.entries(INITIAL_PRESETS)) {
-        if (!(name in store.presets)) store.presets[name] = bundle
-      }
-      if (!store.defaultName) store.defaultName = 'default'
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(store))
-      localStorage.setItem(MIGRATION_KEY, '1')
-    }
-
-    // 既存の default が旧既定値のままなら新しい座標系設定へ移行する。
-    // 他の値が変わっている場合はユーザー編集とみなし、そのまま保持する。
-    if (localStorage.getItem(DEFAULT_FLIP_Y_MIGRATION_KEY) !== '1') {
-      const defaultPreset = store.presets.default
-      const settings = defaultPreset?.gcodeSettings
-      const { flipY: _flipY, ...currentSettings } = DEFAULT_GCODE_SETTINGS
-      const { flipY: previousFlipY, ...previousSettings } = settings ?? {}
-      if (
-        settings &&
-        previousFlipY !== true &&
-        JSON.stringify(previousSettings) === JSON.stringify(currentSettings)
-      ) {
-        settings.flipY = true
-        writeStore(store)
-      }
-      localStorage.setItem(DEFAULT_FLIP_Y_MIGRATION_KEY, '1')
-    }
+    addInitialPresets(store)
+    migrateDefaultFlipY(store)
     return store
   } catch {
     return { defaultName: null, presets: {} }

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useFloatingPanelDismiss } from '../strokeList/useFloatingPanelDismiss'
+import { useFloatingPanelDismiss } from '../common/useFloatingPanelDismiss'
 
 interface SettingsPresetMenuProps {
   /** 現在読み込んでいる設定プリセット名(未ロードならnull) */

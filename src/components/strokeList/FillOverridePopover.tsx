@@ -3,7 +3,7 @@ import { XMarkIcon } from '../common/icons'
 import { FillSettingsPanel } from '../settings/FillSettingsPanel'
 import { resolveEffectiveFillSettings } from '../../core/fill/overrides'
 import type { FillSettings } from '../../core/fill/types'
-import { useFloatingPanelDismiss } from './useFloatingPanelDismiss'
+import { useFloatingPanelDismiss } from '../common/useFloatingPanelDismiss'
 
 export interface FillOverridePopoverState {
   x: number

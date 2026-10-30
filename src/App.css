@@ -7,6 +7,7 @@
   --control-hover-bg: rgb(10 132 255 / 22%);
 }
 
+/* アプリ全体とパネルレイアウト */
 .app-shell {
   display: flex;
   flex-direction: column;
@@ -109,6 +110,7 @@
   color: #1f2328;
 }
 
+/* 設定パネルの入力欄・補助表示 */
 .settings-group {
   display: flex;
   flex-direction: column;
@@ -283,6 +285,7 @@ label.settings-checkbox-label {
   border-bottom-color: var(--text-h);
 }
 
+/* プレビュー上のエラー表示とオーバーレイ */
 /* プレビューのCanvas上に重ねて表示する。position:absoluteでcanvasの並び・サイズには影響しない */
 .preview-error-overlay {
   position: absolute;
@@ -405,6 +408,7 @@ label.settings-checkbox-label {
   transition: width 120ms ease-out;
 }
 
+/* プレビュー見出しと表示切り替え */
 .preview-title {
   display: flex;
   align-items: baseline;
@@ -464,6 +468,7 @@ label.settings-checkbox-label {
   border-color: var(--highlight-selected-bar, #0a84ff);
 }
 
+/* ストロークリストと選択状態 */
 .stroke-list {
   list-style: none;
   margin: 0;
@@ -601,6 +606,7 @@ label.settings-checkbox-label {
   flex-shrink: 0;
 }
 
+/* 設定アクションとフローティングメニュー */
 .settings-actions {
   display: flex;
   flex-direction: column;
@@ -811,6 +817,7 @@ label.settings-checkbox-label {
   color: var(--text);
 }
 
+/* ヘルプ・確認・プリセットダイアログ */
 .help-dialog-backdrop {
   z-index: 110;
 }

@@ -117,22 +117,30 @@ export function runConnect(mode: ConnectMode): Point[][] {
     const followable = (index: number): boolean =>
       mode.canFollow === undefined || mode.canFollow(previous, order[index])
 
-    // 1. 優先候補: 標準順で直後の断片
-    const successor = lastIndex + 1
-    if (successor < n && !visited[successor] && followable(successor)) {
-      for (const visit of mode.visits(order[successor], successor, state)) {
-        const link = mode.link(tail, visit.entry, true)
-        if (link) {
-          chosen = { index: successor, visit, link }
-          break
+    const findPreferredCandidate = (): {
+      index: number
+      visit: Visit
+      link: Link
+    } | null => {
+      // 1. 優先候補: 標準順で直後の断片
+      const successor = lastIndex + 1
+      if (successor < n && !visited[successor] && followable(successor)) {
+        for (const visit of mode.visits(order[successor], successor, state)) {
+          const link = mode.link(tail, visit.entry, true)
+          if (link) return { index: successor, visit, link }
         }
       }
+      return null
     }
 
-    // 2. フォールバック: 未訪問の断片全体から、接続できるもののうち最も近いもの。
-    //    標準順の直後だけを見ていると、図の上では隣接しているのに配列上は離れている断片が
-    //    繋がらず、無用にチェーンが分割される
-    if (!chosen) {
+    const findFallbackCandidate = (): {
+      index: number
+      visit: Visit
+      link: Link
+    } | null => {
+      // 2. フォールバック: 未訪問の断片全体から、接続できるもののうち最も近いもの。
+      //    標準順の直後だけを見ていると、図の上では隣接しているのに配列上は離れている断片が
+      //    繋がらず、無用にチェーンが分割される
       const candidates: { index: number; visit: Visit; distance: number }[] = []
       for (let i = 0; i < n; i++) {
         if (visited[i] || !followable(i)) continue
@@ -156,11 +164,12 @@ export function runConnect(mode: ConnectMode): Point[][] {
         }
         const link = mode.link(tail, c.visit.entry, false)
         if (link) {
-          chosen = { index: c.index, visit: c.visit, link }
-          break
+          return { index: c.index, visit: c.visit, link }
         }
       }
+      return null
     }
+    chosen = findPreferredCandidate() ?? findFallbackCandidate()
 
     if (chosen) {
       take(chosen.index, chosen.visit, chosen.link)

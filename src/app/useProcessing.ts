@@ -101,32 +101,49 @@ export function useProcessing({
       { type: 'module' },
     )
     workerRef.current = worker
-    worker.onmessage = (event: MessageEvent<ProcessingResponse>) => {
-      const message = event.data
-      if (message.type === 'progress') {
-        if (message.phase === 'fill') {
-          if (message.requestId !== fillRequestIdRef.current) return
-          setFillPercent(message.percent)
-        } else {
-          if (message.requestId !== joinRequestIdRef.current) return
-          setJoinPercent(message.percent)
-        }
-        return
-      }
-      if (message.type === 'fill-done') {
+    const handleProgress = (
+      message: Extract<ProcessingResponse, { type: 'progress' }>,
+    ): void => {
+      if (message.phase === 'fill') {
         if (message.requestId !== fillRequestIdRef.current) return
-        const forParseResult = pendingFillParseResultRef.current
-        if (forParseResult === null) return
-        setFillProcessed({
-          parseResult: forParseResult,
-          value: message.fillBlocks,
-        })
+        setFillPercent(message.percent)
         return
       }
+      if (message.requestId !== joinRequestIdRef.current) return
+      setJoinPercent(message.percent)
+    }
+    const handleFillDone = (
+      message: Extract<ProcessingResponse, { type: 'fill-done' }>,
+    ): void => {
+      if (message.requestId !== fillRequestIdRef.current) return
+      const forParseResult = pendingFillParseResultRef.current
+      if (forParseResult === null) return
+      setFillProcessed({
+        parseResult: forParseResult,
+        value: message.fillBlocks,
+      })
+    }
+    const handleJoinDone = (
+      message: Extract<ProcessingResponse, { type: 'join-done' }>,
+    ): void => {
       if (message.requestId !== joinRequestIdRef.current) return
       const forParseResult = pendingJoinParseResultRef.current
       if (forParseResult === null) return
       setJoinProcessed({ parseResult: forParseResult, value: message.blocks })
+    }
+    worker.onmessage = (event: MessageEvent<ProcessingResponse>) => {
+      const message = event.data
+      switch (message.type) {
+        case 'progress':
+          handleProgress(message)
+          return
+        case 'fill-done':
+          handleFillDone(message)
+          return
+        case 'join-done':
+          handleJoinDone(message)
+          return
+      }
     }
     return () => worker.terminate()
   }, [])

@@ -44,6 +44,30 @@ const DEFAULT_PANEL_WIDTH = 280
 const MIN_PANEL_WIDTH = 220
 const MAX_PANEL_WIDTH = 640
 
+function usePanelResize() {
+  const [width, setWidth] = useState(DEFAULT_PANEL_WIDTH)
+  const widthRef = useRef(width)
+  widthRef.current = width
+
+  const handleResizeStart = useCallback((e: ReactMouseEvent): void => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startWidth = widthRef.current
+    const handleMouseMove = (moveEvent: MouseEvent): void => {
+      const next = startWidth + (startX - moveEvent.clientX)
+      setWidth(Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, next)))
+    }
+    const handleMouseUp = (): void => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+  }, [])
+
+  return { width, handleResizeStart }
+}
+
 /**
  * FR-43: 選択中・メニュー対象の行だけにマッチするCSSルールを組み立てる。
  * classNameで表現するとリスト全体の再レンダが必要になるため、属性セレクタで差し込む
@@ -88,9 +112,7 @@ function StrokeListPanelImpl({
   onSelect,
 }: StrokeListPanelProps) {
   const [isOpen, setIsOpen] = useState(true)
-  const [width, setWidth] = useState(DEFAULT_PANEL_WIDTH)
-  const widthRef = useRef(width)
-  widthRef.current = width
+  const { width, handleResizeStart } = usePanelResize()
   const [expandedKeys, setExpandedKeys] =
     useState<ReadonlySet<string>>(EMPTY_EXPANDED)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
@@ -166,24 +188,6 @@ function StrokeListPanelImpl({
     },
     [clipboardFillSettings, onPatchFillOverride],
   )
-
-  // パネル幅のドラッグリサイズ。このパネルは右端にあるため、左端ハンドルを左へ
-  // ドラッグするほど幅が広がる(startX - clientXの符号に注意)
-  const handleResizeStart = useCallback((e: ReactMouseEvent): void => {
-    e.preventDefault()
-    const startX = e.clientX
-    const startWidth = widthRef.current
-    const handleMouseMove = (moveEvent: MouseEvent): void => {
-      const next = startWidth + (startX - moveEvent.clientX)
-      setWidth(Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, next)))
-    }
-    const handleMouseUp = (): void => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleMouseUp)
-    }
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', handleMouseUp)
-  }, [])
 
   const rowRules = buildRowRules(
     selectedKey,

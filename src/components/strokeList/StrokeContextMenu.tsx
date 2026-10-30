@@ -6,7 +6,7 @@ import type {
   StrokeListEntry,
 } from '../../core/plan/types'
 import { joinOverrideKey } from '../../core/plan/strokeJoin'
-import { useFloatingPanelDismiss } from './useFloatingPanelDismiss'
+import { useFloatingPanelDismiss } from '../common/useFloatingPanelDismiss'
 
 /** 右クリックメニューの表示状態。targetはFR-43のハイライトと同じ行識別情報 */
 export interface ContextMenuState {

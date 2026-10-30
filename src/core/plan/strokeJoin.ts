@@ -26,6 +26,11 @@ interface Candidate {
   forced: boolean
 }
 
+type StrokeLinks = Record<
+  number,
+  Partial<Record<EndName, { stroke: number; end: EndName }>>
+>
+
 class DisjointSet {
   private readonly parent: number[]
   constructor(n: number) {
@@ -61,6 +66,18 @@ export function buildJoinedBlocks(
   joinDistanceMm: number,
   overrides: Map<string, boolean>,
 ): JoinedBlock[] {
+  const n = strokes.length
+  const candidates = enumerateCandidates(strokes, joinDistanceMm, overrides)
+  const links = selectLinks(n, candidates)
+  return buildBlocks(n, links)
+}
+
+/** 既存の走査順で候補ペアを列挙し、ペアごとの最短端点組み合わせを保持する。 */
+function enumerateCandidates(
+  strokes: ParsedStroke[],
+  joinDistanceMm: number,
+  overrides: Map<string, boolean>,
+): Candidate[] {
   const n = strokes.length
   const endPoint = (i: number, end: EndName): Point =>
     end === 'start' ? strokes[i].points[0] : strokes[i].points.at(-1)!
@@ -150,12 +167,14 @@ export function buildJoinedBlocks(
     return x.distance - y.distance
   })
 
+  return candidates
+}
+
+/** 候補の距離順で端点リンクを選び、閉ループを避ける。 */
+function selectLinks(n: number, candidates: Candidate[]): StrokeLinks {
   const usedEnd = new Set<string>()
   const dsu = new DisjointSet(n)
-  const links: Record<
-    number,
-    Partial<Record<EndName, { stroke: number; end: EndName }>>
-  > = {}
+  const links: StrokeLinks = {}
   for (let i = 0; i < n; i++) links[i] = {}
 
   for (const c of candidates) {
@@ -170,6 +189,11 @@ export function buildJoinedBlocks(
     links[c.b][c.bEnd] = { stroke: c.a, end: c.aEnd }
   }
 
+  return links
+}
+
+/** 選択済みリンクを開始端から辿り、元のストローク順でブロック化する。 */
+function buildBlocks(n: number, links: StrokeLinks): JoinedBlock[] {
   const visited = new Array(n).fill(false)
   const blocks: JoinedBlock[] = []
 

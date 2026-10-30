@@ -95,6 +95,82 @@ function useContainerSize(
   return size
 }
 
+/** 画面上の座標を mm に変換してセグメントを判定する。 */
+function findSegmentFromScreenPoint(
+  segments: PreviewSegment[],
+  view: View,
+  x: number,
+  y: number,
+): number | null {
+  if (view.scale === 0) return null
+  const point = screenToMm(view, x, y)
+  return findSegmentAtPoint(segments, point, HIT_TEST_THRESHOLD_PX / view.scale)
+}
+
+function useSegmentPointerHandlers(
+  containerRef: React.RefObject<HTMLDivElement | null>,
+  segments: PreviewSegment[],
+  view: View,
+  onSegmentHover: PreviewPanelProps['onSegmentHover'],
+  onSegmentSelect: PreviewPanelProps['onSegmentSelect'],
+) {
+  const pendingMoveRef = useRef<{ x: number; y: number } | null>(null)
+  const hoverRafRef = useRef(0)
+
+  useEffect(
+    () => () => {
+      if (hoverRafRef.current) cancelAnimationFrame(hoverRafRef.current)
+    },
+    [],
+  )
+
+  const runHoverHitTest = useCallback((): void => {
+    hoverRafRef.current = 0
+    const pending = pendingMoveRef.current
+    if (!pending || view.scale === 0) return
+    onSegmentHover(
+      findSegmentFromScreenPoint(segments, view, pending.x, pending.y),
+    )
+  }, [segments, view, onSegmentHover])
+
+  const handleMouseMove = useCallback(
+    (e: ReactMouseEvent<HTMLDivElement>): void => {
+      const rect = containerRef.current?.getBoundingClientRect()
+      if (!rect) return
+      pendingMoveRef.current = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      }
+      if (!hoverRafRef.current) {
+        hoverRafRef.current = requestAnimationFrame(runHoverHitTest)
+      }
+    },
+    [containerRef, runHoverHitTest],
+  )
+
+  const handleMouseLeave = useCallback((): void => {
+    pendingMoveRef.current = null
+    onSegmentHover(null)
+  }, [onSegmentHover])
+
+  const handleClick = useCallback(
+    (e: ReactMouseEvent<HTMLDivElement>): void => {
+      const rect = containerRef.current?.getBoundingClientRect()
+      if (!rect) return
+      const index = findSegmentFromScreenPoint(
+        segments,
+        view,
+        e.clientX - rect.left,
+        e.clientY - rect.top,
+      )
+      if (index !== null) onSegmentSelect(index)
+    },
+    [containerRef, segments, view, onSegmentSelect],
+  )
+
+  return { handleMouseMove, handleMouseLeave, handleClick }
+}
+
 /**
  * プレビュー列。描画は4枚のCanvasを重ねて分担する:
  *  - ベース: ベッドの白塗り+全セグメントのゴースト表示
@@ -315,62 +391,15 @@ function PreviewPanelImpl({
     )
   }, [segments, view, hoverHighlight, selectedHighlight, lineWidthPx])
 
-  // FR-43(プレビュー→リスト方向): ヒット判定は毎mousemoveでなくrAFでコアレスする
-  // (数万セグメントのファイルで距離計算が重いため)
-  const pendingMoveRef = useRef<{ x: number; y: number } | null>(null)
-  const hoverRafRef = useRef(0)
-
-  useEffect(
-    () => () => {
-      if (hoverRafRef.current) cancelAnimationFrame(hoverRafRef.current)
-    },
-    [],
-  )
-
-  const runHoverHitTest = useCallback((): void => {
-    hoverRafRef.current = 0
-    const pending = pendingMoveRef.current
-    if (!pending || view.scale === 0) return
-    const point = screenToMm(view, pending.x, pending.y)
-    const thresholdMm = HIT_TEST_THRESHOLD_PX / view.scale
-    onSegmentHover(findSegmentAtPoint(segments, point, thresholdMm))
-  }, [segments, view, onSegmentHover])
-
-  const handleMouseMove = useCallback(
-    (e: ReactMouseEvent<HTMLDivElement>): void => {
-      const rect = containerRef.current?.getBoundingClientRect()
-      if (!rect) return
-      pendingMoveRef.current = {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
-      }
-      if (!hoverRafRef.current) {
-        hoverRafRef.current = requestAnimationFrame(runHoverHitTest)
-      }
-    },
-    [runHoverHitTest],
-  )
-
-  const handleMouseLeave = useCallback((): void => {
-    pendingMoveRef.current = null
-    onSegmentHover(null)
-  }, [onSegmentHover])
-
-  const handleClick = useCallback(
-    (e: ReactMouseEvent<HTMLDivElement>): void => {
-      const rect = containerRef.current?.getBoundingClientRect()
-      if (!rect || view.scale === 0) return
-      const point = screenToMm(
-        view,
-        e.clientX - rect.left,
-        e.clientY - rect.top,
-      )
-      const thresholdMm = HIT_TEST_THRESHOLD_PX / view.scale
-      const index = findSegmentAtPoint(segments, point, thresholdMm)
-      if (index !== null) onSegmentSelect(index)
-    },
-    [segments, view, onSegmentSelect],
-  )
+  // FR-43: ポインターイベントとrAFヒット判定を一つのフックに集約する
+  const { handleMouseMove, handleMouseLeave, handleClick } =
+    useSegmentPointerHandlers(
+      containerRef,
+      segments,
+      view,
+      onSegmentHover,
+      onSegmentSelect,
+    )
 
   return (
     <section className="panel panel-preview">
