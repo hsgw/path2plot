@@ -16,6 +16,8 @@ export interface SettingsBundle {
   fillSettings: FillSettings
   joinDistanceMm: number
   penWidthMm: number
+  /** 通常ストロークの最小総延長(mm)。旧プリセットでは0として扱う */
+  minStrokeLengthMm?: number
 }
 
 interface SettingsStore {
@@ -35,6 +37,7 @@ function createInitialBundle(gcodeSettings: GcodeSettings): SettingsBundle {
     fillSettings: { ...DEFAULT_FILL_SETTINGS },
     joinDistanceMm: DEFAULT_JOIN_DISTANCE_MM,
     penWidthMm: 0,
+    minStrokeLengthMm: 0,
   }
 }
 
@@ -136,6 +139,7 @@ export function loadDefaultSettingsPreset(): SettingsBundle | null {
 function normalizePreset(preset: SettingsBundle): SettingsBundle {
   return {
     ...preset,
+    minStrokeLengthMm: preset.minStrokeLengthMm ?? 0,
     gcodeSettings: {
       ...preset.gcodeSettings,
       flipY: preset.gcodeSettings.flipY ?? false,

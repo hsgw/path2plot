@@ -38,6 +38,7 @@ import {
 } from './core/plan/strokeJoin'
 import type { UnitOrder } from './core/plan/types'
 import { parseSvgFile } from './core/svg/parseSvgFile'
+import { filterJoinedBlocksByMinimumLength } from './core/plan/strokeLength'
 import { DEFAULT_PARSE_SETTINGS, type ParseSettings } from './core/svg/types'
 
 function App() {
@@ -74,6 +75,9 @@ function App() {
   const [penWidthMm, setPenWidthMm] = useState(
     () => loadDefaultSettingsPreset()?.penWidthMm ?? 0,
   )
+  const [minStrokeLengthMm, setMinStrokeLengthMm] = useState(
+    () => loadDefaultSettingsPreset()?.minStrokeLengthMm ?? 0,
+  )
   // 現在読み込んでいる設定プリセット名。起動時のデフォルト読込・ロードダイアログでの読込時に加え、
   // 保存時も更新する(保存=その名前の設定を読み込んでいる状態とみなす)
   const [currentSettingsName, setCurrentSettingsName] = useState<string | null>(
@@ -101,7 +105,7 @@ function App() {
     if (svgText === null) return null
     return parseSvgFile(svgText, settings)
   }, [svgText, settings])
-  // parseResultが変わらない限り同じ参照を保ち、下流のuseMemoが無駄に再計算されないようにする
+  // 閾値判定より先に結合できるよう、全ストロークをそのまま処理へ渡す
   const strokes = useMemo(() => parseResult?.strokes ?? [], [parseResult])
 
   const processing = useProcessing({
@@ -112,9 +116,21 @@ function App() {
     joinOverrides,
   })
 
+  // 結合前は各ストロークを個別ブロックとして判定し、結合後は接続距離を含む
+  // 結合ブロック全体の経路長で判定する。塗りブロックは別系統のため影響しない。
+  const visibleBlocks = useMemo(
+    () =>
+      filterJoinedBlocksByMinimumLength(
+        processing.blocks,
+        strokes,
+        minStrokeLengthMm,
+      ),
+    [processing.blocks, strokes, minStrokeLengthMm],
+  )
+
   const units = useMemo(
-    () => toDrawUnits(processing.blocks, processing.fillBlocks),
-    [processing.blocks, processing.fillBlocks],
+    () => toDrawUnits(visibleBlocks, processing.fillBlocks),
+    [visibleBlocks, processing.fillBlocks],
   )
 
   // FR-15: 貪欲法による並び替え結果(「最適化」ボタン押下時のみ設定)。
@@ -179,8 +195,16 @@ function App() {
       fillSettings,
       joinDistanceMm,
       penWidthMm,
+      minStrokeLengthMm,
     }),
-    [settings, gcodeSettings, fillSettings, joinDistanceMm, penWidthMm],
+    [
+      settings,
+      gcodeSettings,
+      fillSettings,
+      joinDistanceMm,
+      penWidthMm,
+      minStrokeLengthMm,
+    ],
   )
   const handleLoadSettingsBundle = useCallback(
     (bundle: SettingsBundle, name: string): void => {
@@ -189,6 +213,7 @@ function App() {
       setFillSettings(bundle.fillSettings)
       setJoinDistanceMm(bundle.joinDistanceMm)
       setPenWidthMm(bundle.penWidthMm)
+      setMinStrokeLengthMm(bundle.minStrokeLengthMm ?? 0)
       setCurrentSettingsName(name)
     },
     [],
@@ -251,6 +276,14 @@ function App() {
       }))
     }
   }, [])
+  const handleMinStrokeLengthChange = useCallback(
+    (next: number): void => {
+      if (next === minStrokeLengthMm) return
+      setMinStrokeLengthMm(next)
+      setOptimizedOrder(null)
+    },
+    [minStrokeLengthMm],
+  )
   const handleSetJoinOverride = useCallback(
     (idA: string, idB: string, join: boolean): void => {
       setJoinOverrides((prev) => {
@@ -345,6 +378,8 @@ function App() {
           joinDistanceMm={joinDistanceMm}
           onJoinDistanceChange={setJoinDistanceMm}
           penWidthMm={penWidthMm}
+          minStrokeLengthMm={minStrokeLengthMm}
+          onMinStrokeLengthChange={handleMinStrokeLengthChange}
           onPenWidthChange={handlePenWidthChange}
           onJoinPaths={processing.activateJoin}
           onOptimize={handleOptimize}

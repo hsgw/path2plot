@@ -36,7 +36,28 @@ describe('settings preset initialization', () => {
     expect(loadSettingsPreset('default')).toMatchObject({
       joinDistanceMm: 0.5,
       penWidthMm: 0,
+      minStrokeLengthMm: 0,
     })
+  })
+
+  it('旧形式の保存済みプリセットでは通常ストローク最小長を0に補完する', () => {
+    memory.set(
+      'path2plot.settingsPresets',
+      JSON.stringify({
+        defaultName: 'old',
+        presets: {
+          old: {
+            parseSettings: {},
+            gcodeSettings: {},
+            fillSettings: {},
+            joinDistanceMm: 0.5,
+            penWidthMm: 0,
+          },
+        },
+      }),
+    )
+    memory.set('path2plot.settingsPresets.initialPresets.v1', '1')
+    expect(loadSettingsPreset('old')?.minStrokeLengthMm ?? 0).toBe(0)
   })
 
   it('既存プリセットと既定選択を保持し、不足プリセットだけ追加する', () => {

@@ -29,6 +29,8 @@ interface SettingsPanelProps {
   /** ペン先の太さ(mm)。0=未入力 */
   penWidthMm: number
   onPenWidthChange: (penWidthMm: number) => void
+  minStrokeLengthMm: number
+  onMinStrokeLengthChange: (lengthMm: number) => void
   onJoinPaths: () => void
   onOptimize: () => void
   onResetAll: () => void
@@ -61,6 +63,8 @@ export function SettingsPanel({
   onJoinDistanceChange,
   penWidthMm,
   onPenWidthChange,
+  minStrokeLengthMm,
+  onMinStrokeLengthChange,
   onJoinPaths,
   onOptimize,
   onResetAll,
@@ -226,6 +230,17 @@ export function SettingsPanel({
 
           <div className="settings-group">
             <h3>パス結合</h3>
+            <NumberField
+              label="通常ストローク最小長(mm)"
+              value={minStrokeLengthMm}
+              min={0}
+              step={0.1}
+              hint="結合前は各ストローク単位、結合後は接続距離を含むブロック全体の経路長で判定し、短いブロックをプレビューとG-codeから除外します。"
+              onCommit={onMinStrokeLengthChange}
+              onValidityChange={(valid) =>
+                setValidity('minStrokeLengthMm', '通常ストローク最小長', valid)
+              }
+            />
             <NumberField
               label="端点結合距離(mm)"
               value={joinDistanceMm}
