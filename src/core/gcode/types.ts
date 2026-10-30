@@ -75,6 +75,8 @@ export interface GcodeSettings {
   bedOriginXMm: number
   /** 描画可能領域のローカル原点(0,0)に対応する機械絶対座標Y(mm)。bedOriginXMm参照 */
   bedOriginYMm: number
+  /** G-code出力時にローカルYをベッド高さ基準で反転する(プレビュー座標は変更しない) */
+  flipY: boolean
   /** ペン交換パーク位置X(mm、FR-30/31参考値) */
   parkX: number
   /** ペン交換パーク位置Y(mm、FR-30/31参考値) */
@@ -111,6 +113,7 @@ export const DEFAULT_GCODE_SETTINGS: GcodeSettings = {
   bedHeightMm: 155,
   bedOriginXMm: 49,
   bedOriginYMm: 35,
+  flipY: false,
   // OQ-9未確定のため参考値
   parkX: 85,
   parkY: 175,

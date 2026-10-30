@@ -10,7 +10,7 @@ interface GcodeSettingsPanelProps {
 }
 
 /** テンプレート以外の設定項目(すべて数値)のキー */
-type NumberSettingKey = keyof Omit<GcodeSettings, 'templates'>
+type NumberSettingKey = keyof Omit<GcodeSettings, 'templates' | 'flipY'>
 
 const TEMPLATE_LABELS: { key: keyof GcodeTemplates; label: string }[] = [
   { key: 'start', label: '開始' },
@@ -92,6 +92,16 @@ export function GcodeSettingsPanel({
         </h3>
         {numberField('X(mm)', 'bedOriginXMm', 0.1)}
         {numberField('Y(mm)', 'bedOriginYMm', 0.1)}
+        <label className="settings-checkbox-label">
+          <input
+            type="checkbox"
+            checked={settings.flipY ?? false}
+            onChange={(e) =>
+              onSettingsChange({ ...settings, flipY: e.target.checked })
+            }
+          />
+          Y座標を上下反転
+        </label>
       </div>
 
       <div className="settings-group">

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_GCODE_SETTINGS, type DrawGroup } from './types'
+import {
+  DEFAULT_GCODE_SETTINGS,
+  type DrawGroup,
+  type GcodeSettings,
+} from './types'
 import { generateGcode } from './generate'
 
 const groups: DrawGroup[] = [
@@ -43,6 +47,26 @@ describe('generateGcode', () => {
     const gcode = generateGcode(groups, settings)
     expect(gcode).toContain('G00 X0 Y0')
     expect(gcode).toContain('G01 X10 Y0')
+  })
+
+  it('Y反転を有効にすると移動・描画のYをベッド高さ基準で反転して原点を加算する', () => {
+    const settings = {
+      ...DEFAULT_GCODE_SETTINGS,
+      bedHeightMm: 100,
+      bedOriginYMm: 30,
+      flipY: true,
+    }
+    const gcode = generateGcode(groups, settings)
+    expect(gcode).toContain('G00 X49 Y130')
+    expect(gcode).toContain('G01 X59 Y130')
+    expect(gcode).not.toContain('{flipY}')
+  })
+
+  it('Y反転が未設定の既存設定では無効として扱う', () => {
+    const { flipY: _flipY, ...legacySettings } = DEFAULT_GCODE_SETTINGS
+    const gcode = generateGcode(groups, legacySettings as GcodeSettings)
+    expect(gcode).toContain('G00 X49 Y35')
+    expect(gcode).toContain('G01 X59 Y35')
   })
 
   it('結合ブロック(FR-14)は1グループ内で1回のペンダウン/アップのみ出力し、連続してG01を出力する', () => {

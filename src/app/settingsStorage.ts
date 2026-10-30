@@ -66,13 +66,26 @@ export function saveSettingsPreset(
 }
 
 export function loadSettingsPreset(name: string): SettingsBundle | null {
-  return readStore().presets[name] ?? null
+  const preset = readStore().presets[name]
+  return preset ? normalizePreset(preset) : null
 }
 
 export function loadDefaultSettingsPreset(): SettingsBundle | null {
   const store = readStore()
   if (store.defaultName === null) return null
-  return store.presets[store.defaultName] ?? null
+  const preset = store.presets[store.defaultName]
+  return preset ? normalizePreset(preset) : null
+}
+
+/** 古い保存済みプリセットに追加設定がない場合は既定値(OFF)へ補完する */
+function normalizePreset(preset: SettingsBundle): SettingsBundle {
+  return {
+    ...preset,
+    gcodeSettings: {
+      ...preset.gcodeSettings,
+      flipY: preset.gcodeSettings.flipY ?? false,
+    },
+  }
 }
 
 export function setDefaultSettingsPresetName(name: string): void {

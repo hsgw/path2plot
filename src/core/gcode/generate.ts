@@ -16,7 +16,9 @@ function fmt(n: number): string {
 function toMachinePoint(p: Point, settings: GcodeSettings): Point {
   return {
     x: p.x + settings.bedOriginXMm,
-    y: p.y + settings.bedOriginYMm,
+    y:
+      (settings.flipY === true ? settings.bedHeightMm - p.y : p.y) +
+      settings.bedOriginYMm,
   }
 }
 
@@ -26,7 +28,7 @@ function toMachinePoint(p: Point, settings: GcodeSettings): Point {
  * 異なる値を指すことを避けるため)。
  */
 function buildTemplateVars(settings: GcodeSettings): Record<string, number> {
-  const { templates: _templates, ...vars } = settings
+  const { templates: _templates, flipY: _flipY, ...vars } = settings
   return vars
 }
 
