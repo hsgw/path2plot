@@ -1,6 +1,13 @@
 import type { FillSettings } from '../core/fill/types'
-import type { GcodeSettings } from '../core/gcode/types'
+import {
+  DEFAULT_GCODE_SETTINGS,
+  PRUSA_PEN_GCODE_SETTINGS,
+  type GcodeSettings,
+} from '../core/gcode/types'
 import type { ParseSettings } from '../core/svg/types'
+import { DEFAULT_PARSE_SETTINGS } from '../core/svg/types'
+import { DEFAULT_FILL_SETTINGS } from '../core/fill/types'
+import { DEFAULT_JOIN_DISTANCE_MM } from '../core/plan/strokeJoin'
 
 /** 保存/ロード対象となる設定一式(現在読み込み中のSVGやストローク並び順は含まない) */
 export interface SettingsBundle {
@@ -18,16 +25,64 @@ interface SettingsStore {
 }
 
 const STORAGE_KEY = 'path2plot.settingsPresets'
+const MIGRATION_KEY = 'path2plot.settingsPresets.initialPresets.v1'
+const DEFAULT_FLIP_Y_MIGRATION_KEY = 'path2plot.settingsPresets.defaultFlipY.v1'
+
+function createInitialBundle(gcodeSettings: GcodeSettings): SettingsBundle {
+  return {
+    parseSettings: { ...DEFAULT_PARSE_SETTINGS },
+    gcodeSettings,
+    fillSettings: { ...DEFAULT_FILL_SETTINGS },
+    joinDistanceMm: DEFAULT_JOIN_DISTANCE_MM,
+    penWidthMm: 0,
+  }
+}
+
+const INITIAL_PRESETS: Record<string, SettingsBundle> = {
+  default: createInitialBundle(DEFAULT_GCODE_SETTINGS),
+  prusa_pen: createInitialBundle(PRUSA_PEN_GCODE_SETTINGS),
+}
 
 function readStore(): SettingsStore {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { defaultName: null, presets: {} }
-    const parsed = JSON.parse(raw) as Partial<SettingsStore>
-    return {
-      defaultName: parsed.defaultName ?? null,
-      presets: parsed.presets ?? {},
+    const parsed = raw ? (JSON.parse(raw) as Partial<SettingsStore>) : null
+    const store: SettingsStore = parsed
+      ? {
+          defaultName: parsed.defaultName ?? null,
+          presets: parsed.presets ?? {},
+        }
+      : { defaultName: null, presets: {} }
+
+    // 一度だけ不足分を追加する。既存の同名プリセットとデフォルト選択は保持し、
+    // マーカーでユーザーが削除した初期プリセットを次回以降に復活させない。
+    if (localStorage.getItem(MIGRATION_KEY) !== '1') {
+      for (const [name, bundle] of Object.entries(INITIAL_PRESETS)) {
+        if (!(name in store.presets)) store.presets[name] = bundle
+      }
+      if (!store.defaultName) store.defaultName = 'default'
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(store))
+      localStorage.setItem(MIGRATION_KEY, '1')
     }
+
+    // 既存の default が旧既定値のままなら新しい座標系設定へ移行する。
+    // 他の値が変わっている場合はユーザー編集とみなし、そのまま保持する。
+    if (localStorage.getItem(DEFAULT_FLIP_Y_MIGRATION_KEY) !== '1') {
+      const defaultPreset = store.presets.default
+      const settings = defaultPreset?.gcodeSettings
+      const { flipY: _flipY, ...currentSettings } = DEFAULT_GCODE_SETTINGS
+      const { flipY: previousFlipY, ...previousSettings } = settings ?? {}
+      if (
+        settings &&
+        previousFlipY !== true &&
+        JSON.stringify(previousSettings) === JSON.stringify(currentSettings)
+      ) {
+        settings.flipY = true
+        writeStore(store)
+      }
+      localStorage.setItem(DEFAULT_FLIP_Y_MIGRATION_KEY, '1')
+    }
+    return store
   } catch {
     return { defaultName: null, presets: {} }
   }
@@ -77,7 +132,7 @@ export function loadDefaultSettingsPreset(): SettingsBundle | null {
   return preset ? normalizePreset(preset) : null
 }
 
-/** 古い保存済みプリセットに追加設定がない場合は既定値(OFF)へ補完する */
+/** 古い保存済みプリセットに追加設定がない場合は従来値(OFF)へ補完する */
 function normalizePreset(preset: SettingsBundle): SettingsBundle {
   return {
     ...preset,

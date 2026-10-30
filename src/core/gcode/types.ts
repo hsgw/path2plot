@@ -84,7 +84,7 @@ export interface GcodeSettings {
   templates: GcodeTemplates
 }
 
-export const DEFAULT_GCODE_TEMPLATES: GcodeTemplates = {
+export const PRUSA_PEN_GCODE_TEMPLATES: GcodeTemplates = {
   start: 'M3\nG21\nG90\nG28 W\nG00 Z{travelZ} F720',
   travelMove: 'G00 X{x} Y{y} F{travelFeedRate}',
   penDown: 'G00 Z{penDownZ} F{penFeedRate}',
@@ -94,7 +94,8 @@ export const DEFAULT_GCODE_TEMPLATES: GcodeTemplates = {
 }
 
 /** vpype.toml準拠+実機確定値(FR-31、reference/implementation-status.md Phase3参照) */
-export const DEFAULT_GCODE_SETTINGS: GcodeSettings = {
+/** 従来のPrusa MK3S向け設定。既存ユーザー向けプリセットとして保持する */
+export const PRUSA_PEN_GCODE_SETTINGS: GcodeSettings = {
   drawFeedRate: 4500,
   travelFeedRate: 10000,
   penFeedRate: 750,
@@ -117,5 +118,36 @@ export const DEFAULT_GCODE_SETTINGS: GcodeSettings = {
   // OQ-9未確定のため参考値
   parkX: 85,
   parkY: 175,
+  templates: PRUSA_PEN_GCODE_TEMPLATES,
+}
+
+export const DEFAULT_GCODE_TEMPLATES: GcodeTemplates = {
+  start: 'G90\nG28\nPEN_UP',
+  travelMove: 'M204 S{travelAccel}\nG0 X{x} Y{y} F{travelFeedRate}',
+  penDown: 'PEN_DOWN',
+  drawMove: 'M204 S{drawAccel}\nG1 X{x} Y{y} F{drawFeedRate}',
+  penUp: 'PEN_UP',
+  end: 'PEN_UP\nPLOT_END',
+}
+
+/** 新しいペンプロッター向け既定値 */
+export const DEFAULT_GCODE_SETTINGS: GcodeSettings = {
+  drawFeedRate: 24000,
+  travelFeedRate: 24000,
+  penFeedRate: 750,
+  penDownZ: 19,
+  penUpZ: 23,
+  travelZ: 30,
+  drawAccel: 7000,
+  travelAccel: 8000,
+  xyJerk: 10,
+  minSegmentLengthMm: 0.1,
+  bedWidthMm: 89,
+  bedHeightMm: 53,
+  bedOriginXMm: 3,
+  bedOriginYMm: 14,
+  flipY: true,
+  parkX: 0,
+  parkY: 0,
   templates: DEFAULT_GCODE_TEMPLATES,
 }

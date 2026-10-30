@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  DEFAULT_GCODE_SETTINGS,
+  PRUSA_PEN_GCODE_SETTINGS,
   type DrawGroup,
   type GcodeSettings,
 } from './types'
@@ -16,7 +16,7 @@ const groups: DrawGroup[] = [
 describe('generateGcode', () => {
   it('描画・移動座標には描画可能領域の原点オフセット(bedOriginXMm/YMm)を加算する', () => {
     const settings = {
-      ...DEFAULT_GCODE_SETTINGS,
+      ...PRUSA_PEN_GCODE_SETTINGS,
       bedOriginXMm: 44,
       bedOriginYMm: 30,
     }
@@ -28,7 +28,7 @@ describe('generateGcode', () => {
 
   it('パーク位置(FR-30)は原点オフセットの対象外(絶対座標のまま)', () => {
     const settings = {
-      ...DEFAULT_GCODE_SETTINGS,
+      ...PRUSA_PEN_GCODE_SETTINGS,
       bedOriginXMm: 44,
       bedOriginYMm: 30,
       parkX: 85,
@@ -40,7 +40,7 @@ describe('generateGcode', () => {
 
   it('原点オフセットが0のときはローカル座標のまま出力される', () => {
     const settings = {
-      ...DEFAULT_GCODE_SETTINGS,
+      ...PRUSA_PEN_GCODE_SETTINGS,
       bedOriginXMm: 0,
       bedOriginYMm: 0,
     }
@@ -51,7 +51,7 @@ describe('generateGcode', () => {
 
   it('Y反転を有効にすると移動・描画のYをベッド高さ基準で反転して原点を加算する', () => {
     const settings = {
-      ...DEFAULT_GCODE_SETTINGS,
+      ...PRUSA_PEN_GCODE_SETTINGS,
       bedHeightMm: 100,
       bedOriginYMm: 30,
       flipY: true,
@@ -63,7 +63,7 @@ describe('generateGcode', () => {
   })
 
   it('Y反転が未設定の既存設定では無効として扱う', () => {
-    const { flipY: _flipY, ...legacySettings } = DEFAULT_GCODE_SETTINGS
+    const { flipY: _flipY, ...legacySettings } = PRUSA_PEN_GCODE_SETTINGS
     const gcode = generateGcode(groups, legacySettings as GcodeSettings)
     expect(gcode).toContain('G00 X49 Y35')
     expect(gcode).toContain('G01 X59 Y35')
@@ -71,7 +71,7 @@ describe('generateGcode', () => {
 
   it('結合ブロック(FR-14)は1グループ内で1回のペンダウン/アップのみ出力し、連続してG01を出力する', () => {
     const settings = {
-      ...DEFAULT_GCODE_SETTINGS,
+      ...PRUSA_PEN_GCODE_SETTINGS,
       bedOriginXMm: 0,
       bedOriginYMm: 0,
     }
@@ -93,7 +93,7 @@ describe('generateGcode', () => {
 
   it('複数グループはそれぞれ独立してペンダウン/アップする', () => {
     const settings = {
-      ...DEFAULT_GCODE_SETTINGS,
+      ...PRUSA_PEN_GCODE_SETTINGS,
       bedOriginXMm: 0,
       bedOriginYMm: 0,
     }
