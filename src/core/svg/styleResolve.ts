@@ -1,3 +1,4 @@
+import type { Element } from '@xmldom/xmldom'
 import type { FillRule, StrokeFillState } from './types'
 
 export function parseStyleDeclarations(

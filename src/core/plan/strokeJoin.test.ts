@@ -15,6 +15,33 @@ function stroke(id: string, points: [number, number][]): ParsedStroke {
 }
 
 describe('buildJoinedBlocks', () => {
+  it('方向反転なしでは隣り合うパスの終点から始点のみを結合する', () => {
+    const strokes = [
+      stroke('a', [
+        [1, 0],
+        [3, 0],
+      ]),
+      stroke('b', [
+        [3.1, 0],
+        [5, 0],
+      ]),
+      stroke('c', [
+        [7, 0],
+        [5.1, 0],
+      ]),
+    ]
+    expect(buildJoinedBlocks(strokes, 0.5, new Map(), false)).toEqual([
+      {
+        members: [
+          { strokeIndex: 0, reversed: false },
+          { strokeIndex: 1, reversed: false },
+        ],
+      },
+      { members: [{ strokeIndex: 2, reversed: false }] },
+    ])
+    expect(buildJoinedBlocks(strokes, 0.5, new Map(), true)).toHaveLength(1)
+  })
+
   it('端点が0.5mm以内の3ストロークを1ブロックにチェーンする(近い順)', () => {
     const strokes = [
       stroke('a', [

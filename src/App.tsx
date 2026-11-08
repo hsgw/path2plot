@@ -22,53 +22,53 @@ import { SettingsPanel } from './components/settings/SettingsPanel'
 import { StrokeListPanel } from './components/strokeList/StrokeListPanel'
 import { describeFillPattern } from './core/fill/label'
 import { resolveEffectiveFillSettings } from './core/fill/overrides'
-import { DEFAULT_FILL_SETTINGS, type FillSettings } from './core/fill/types'
+import type { FillSettings } from './core/fill/types'
 import {
   checkFillCandidateBounds,
   checkStrokeBounds,
 } from './core/gcode/boundsCheck'
 import { generateGcode } from './core/gcode/generate'
-import { DEFAULT_GCODE_SETTINGS } from './core/gcode/types'
 import { buildDrawPlan } from './core/plan/drawPlan'
 import { toDrawUnits } from './core/plan/drawUnit'
-import { optimizeDrawOrder } from './core/plan/optimizeOrder'
+import { configuredDrawOrder } from './core/plan/optimizeOrder'
+import { joinOverrideKey } from './core/plan/strokeJoin'
 import {
-  DEFAULT_JOIN_DISTANCE_MM,
-  joinOverrideKey,
-} from './core/plan/strokeJoin'
-import type { UnitOrder } from './core/plan/types'
+  createDefaultSettings,
+  DEFAULT_PATH_OPTIONS,
+  MIN_FILL_SPACING_MM,
+  type PathOptions,
+} from './core/settingsFile'
 import { parseSvgFile } from './core/svg/parseSvgFile'
 import { filterJoinedBlocksByMinimumLength } from './core/plan/strokeLength'
-import { DEFAULT_PARSE_SETTINGS, type ParseSettings } from './core/svg/types'
 
 function useSettingsState() {
-  // 起動時にデフォルト設定を読み込む各項目の初期化順を維持する
-  const [settings, setSettings] = useState<ParseSettings>(
-    () => loadDefaultSettingsPreset()?.parseSettings ?? DEFAULT_PARSE_SETTINGS,
-  )
+  const [initial] = useState(() => {
+    const preset = loadDefaultSettingsPreset()
+    return {
+      bundle: preset ?? createDefaultSettings(),
+      name: preset ? getDefaultSettingsPresetName() : null,
+    }
+  })
+  const [settings, setSettings] = useState(initial.bundle.parseSettings)
   const [gcodeSettings, setGcodeSettings] = useState(
-    () => loadDefaultSettingsPreset()?.gcodeSettings ?? DEFAULT_GCODE_SETTINGS,
+    initial.bundle.gcodeSettings,
   )
-  const [fillSettings, setFillSettings] = useState(
-    () => loadDefaultSettingsPreset()?.fillSettings ?? DEFAULT_FILL_SETTINGS,
-  )
+  const [fillSettings, setFillSettings] = useState(initial.bundle.fillSettings)
   const [fillOverrides, setFillOverrides] =
     useState<Map<string, Partial<FillSettings>>>(EMPTY_FILL_OVERRIDES)
   const [joinDistanceMm, setJoinDistanceMm] = useState(
-    () =>
-      loadDefaultSettingsPreset()?.joinDistanceMm ?? DEFAULT_JOIN_DISTANCE_MM,
+    initial.bundle.joinDistanceMm,
   )
   const [joinOverrides, setJoinOverrides] =
     useState<Map<string, boolean>>(EMPTY_JOIN_OVERRIDES)
-  const [penWidthMm, setPenWidthMm] = useState(
-    () => loadDefaultSettingsPreset()?.penWidthMm ?? 0,
-  )
+  const [penWidthMm, setPenWidthMm] = useState(initial.bundle.penWidthMm)
   const [minStrokeLengthMm, setMinStrokeLengthMm] = useState(
-    () => loadDefaultSettingsPreset()?.minStrokeLengthMm ?? 0,
+    initial.bundle.minStrokeLengthMm,
   )
-  const [currentSettingsName, setCurrentSettingsName] = useState<string | null>(
-    () => (loadDefaultSettingsPreset() ? getDefaultSettingsPresetName() : null),
+  const [configuredPathOptions, setConfiguredPathOptions] = useState(
+    initial.bundle.pathOptions,
   )
+  const [currentSettingsName, setCurrentSettingsName] = useState(initial.name)
 
   const settingsBundle = useMemo<SettingsBundle>(
     () => ({
@@ -78,6 +78,7 @@ function useSettingsState() {
       joinDistanceMm,
       penWidthMm,
       minStrokeLengthMm,
+      pathOptions: configuredPathOptions,
     }),
     [
       settings,
@@ -86,6 +87,7 @@ function useSettingsState() {
       joinDistanceMm,
       penWidthMm,
       minStrokeLengthMm,
+      configuredPathOptions,
     ],
   )
   const handleLoadSettingsBundle = useCallback(
@@ -95,7 +97,8 @@ function useSettingsState() {
       setFillSettings(bundle.fillSettings)
       setJoinDistanceMm(bundle.joinDistanceMm)
       setPenWidthMm(bundle.penWidthMm)
-      setMinStrokeLengthMm(bundle.minStrokeLengthMm ?? 0)
+      setMinStrokeLengthMm(bundle.minStrokeLengthMm)
+      setConfiguredPathOptions(bundle.pathOptions)
       setCurrentSettingsName(name)
     },
     [],
@@ -106,7 +109,10 @@ function useSettingsState() {
       setJoinDistanceMm(next)
       setFillSettings((prev) => ({
         ...prev,
-        spacingMm: next * (1 - prev.overlapPercent / 100),
+        spacingMm: Math.max(
+          MIN_FILL_SPACING_MM,
+          next * (1 - prev.overlapPercent / 100),
+        ),
         fillOffsetMm: next / 2,
       }))
     }
@@ -133,6 +139,8 @@ function useSettingsState() {
     settingsBundle,
     handleLoadSettingsBundle,
     handlePenWidthChange,
+    configuredPathOptions,
+    setConfiguredPathOptions,
   }
 }
 
@@ -215,6 +223,8 @@ function App() {
     settingsBundle,
     handleLoadSettingsBundle,
     handlePenWidthChange,
+    configuredPathOptions,
+    setConfiguredPathOptions,
   } = useSettingsState()
 
   // 数値入力欄で不正な値が確定されたまま残っている項目のラベル一覧(パネルごとに集計)
@@ -232,8 +242,6 @@ function App() {
     [settingsInvalidLabels, gcodeInvalidLabels, fillInvalidLabels],
   )
 
-  // SVGパースはDOMParserに依存し、Workerのグローバルスコープでは利用できない(実機検証で確認済み)
-  // ため、メインスレッドの同期処理のままとする
   const parseResult = useMemo(() => {
     if (svgText === null) return null
     return parseSvgFile(svgText, settings)
@@ -241,12 +249,28 @@ function App() {
   // 閾値判定より先に結合できるよう、全ストロークをそのまま処理へ渡す
   const strokes = useMemo(() => parseResult?.strokes ?? [], [parseResult])
 
+  // 操作ボタンでの変更は現在のSVGにだけ適用し、JSONやプリセットの設定は次のSVGにも引き継ぐ。
+  const [manualPathOptions, setManualPathOptions] = useState<{
+    parseResult: typeof parseResult
+    options: PathOptions
+  } | null>(null)
+  const pathOptions =
+    manualPathOptions?.parseResult === parseResult
+      ? manualPathOptions.options
+      : configuredPathOptions
+  const handlePathOptionsChange = (patch: Partial<PathOptions>): void => {
+    setConfiguredPathOptions({ ...pathOptions, ...patch })
+    setManualPathOptions(null)
+  }
+
   const processing = useProcessing({
     parseResult,
     fillSettings,
     fillOverrides,
     joinDistanceMm,
     joinOverrides,
+    joinActivated: pathOptions.optimizePaths && pathOptions.joinPaths,
+    allowReverse: pathOptions.reversePaths,
   })
 
   // 結合前は各ストロークを個別ブロックとして判定し、結合後は接続距離を含む
@@ -266,12 +290,10 @@ function App() {
     [visibleBlocks, processing.fillBlocks],
   )
 
-  // FR-15: 貪欲法による並び替え結果(「最適化」ボタン押下時のみ設定)。
-  // ユニット構成が変わるような幾何変更(ファイル再読込・結合距離変更・塗り設定変更等)が
-  // 起きたら、buildDrawPlan側で長さの不一致として破棄される
-  const [optimizedOrder, setOptimizedOrder] = useState<UnitOrder | null>(null)
-  const optimizeApplied =
-    optimizedOrder !== null && optimizedOrder.order.length === units.length
+  const optimizedOrder = useMemo(
+    () => configuredDrawOrder(units, strokes, pathOptions),
+    [units, strokes, pathOptions],
+  )
 
   // リストのfill行に出す方式名(fillId→ラベル)。個別上書きで方式が変わる場合があるため
   // fillごとの実効設定から計算する。設定変更からWorkerの結果が返るまでの間だけ表記が先行するが、
@@ -311,20 +333,33 @@ function App() {
     plan.segmentCountPrefix,
   )
 
-  const handleOptimize = useCallback((): void => {
-    setOptimizedOrder(optimizeDrawOrder(units, strokes, { x: 0, y: 0 }))
-  }, [units, strokes])
-  const handleResetAll = useCallback((): void => {
-    setOptimizedOrder(null)
+  const applyManualPathOptions = (patch: Partial<PathOptions>): void => {
+    setManualPathOptions({
+      parseResult,
+      options: { ...pathOptions, optimizePaths: true, ...patch },
+    })
+  }
+  const clearOverrides = useCallback((): void => {
+    setManualPathOptions(null)
     setJoinOverrides(EMPTY_JOIN_OVERRIDES)
     setFillOverrides(EMPTY_FILL_OVERRIDES)
-    processing.resetJoin()
-  }, [processing, setJoinOverrides, setFillOverrides])
+  }, [setJoinOverrides, setFillOverrides])
+  const handleResetAll = (): void => {
+    clearOverrides()
+    setConfiguredPathOptions(DEFAULT_PATH_OPTIONS)
+  }
+  const handleApplySettingsBundle = (
+    bundle: SettingsBundle,
+    name: string,
+  ): void => {
+    clearOverrides()
+    handleLoadSettingsBundle(bundle, name)
+  }
   const handleFileSelected = useCallback(
     (text: string, name: string): void => {
       setSvgText(text)
       setFileName(name)
-      setOptimizedOrder(null)
+      setManualPathOptions(null)
       setJoinOverrides((prev) =>
         prev.size === 0 ? prev : EMPTY_JOIN_OVERRIDES,
       )
@@ -345,7 +380,11 @@ function App() {
     (next: number): void => {
       if (next === minStrokeLengthMm) return
       setMinStrokeLengthMm(next)
-      setOptimizedOrder(null)
+      setManualPathOptions((prev) =>
+        prev
+          ? { ...prev, options: { ...prev.options, optimizeTravel: false } }
+          : prev,
+      )
     },
     [minStrokeLengthMm, setMinStrokeLengthMm],
   )
@@ -400,6 +439,8 @@ function App() {
   ])
   const canDownloadGcode =
     plan.drawGroups.length > 0 &&
+    !processing.isProcessing &&
+    !parseResult?.errors.some((error) => error.kind === 'parse-error') &&
     boundsWarnings.length === 0 &&
     invalidFieldLabels.length === 0
 
@@ -449,8 +490,22 @@ function App() {
           minStrokeLengthMm={minStrokeLengthMm}
           onMinStrokeLengthChange={handleMinStrokeLengthChange}
           onPenWidthChange={handlePenWidthChange}
-          onJoinPaths={processing.activateJoin}
-          onOptimize={handleOptimize}
+          onJoinPaths={() =>
+            applyManualPathOptions(
+              !pathOptions.joinPaths &&
+                !pathOptions.reorderPaths &&
+                !pathOptions.reversePaths
+                ? { joinPaths: true, reversePaths: true, optimizeTravel: false }
+                : { joinPaths: true },
+            )
+          }
+          onOptimize={() =>
+            applyManualPathOptions({
+              optimizeTravel: true,
+              reorderPaths: true,
+              reversePaths: true,
+            })
+          }
           onResetAll={handleResetAll}
           hasEntries={plan.listEntries.length > 0}
           fillSettings={fillSettings}
@@ -461,8 +516,9 @@ function App() {
           canDownloadGcode={canDownloadGcode}
           boundsWarningCount={boundsWarnings.length}
           onDownloadGcode={handleDownloadGcode}
-          settingsBundle={settingsBundle}
-          onLoadSettingsBundle={handleLoadSettingsBundle}
+          settingsBundle={{ ...settingsBundle, pathOptions }}
+          onPathOptionsChange={handlePathOptionsChange}
+          onLoadSettingsBundle={handleApplySettingsBundle}
           currentSettingsName={currentSettingsName}
           onSettingsNameChange={setCurrentSettingsName}
         />
@@ -473,7 +529,7 @@ function App() {
           fillCount={plan.counts.fillCount}
           fillStrokeCount={plan.counts.fillStrokeCount}
           joinApplied={processing.joinActivated}
-          optimizeApplied={optimizeApplied}
+          optimizeApplied={optimizedOrder !== null}
           hoverHighlight={highlight.hoverHighlight}
           selectedHighlight={highlight.selectedHighlight}
           onSegmentHover={highlight.onSegmentHover}

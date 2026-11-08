@@ -6,6 +6,7 @@ import {
 } from '../../app/settingsStorage'
 import type { FillSettings } from '../../core/fill/types'
 import type { GcodeSettings } from '../../core/gcode/types'
+import type { PathOptions } from '../../core/settingsFile'
 import type { ParseSettings } from '../../core/svg/types'
 import { HelpDialog } from '../common/HelpDialog'
 import { InfoHint } from '../common/InfoHint'
@@ -43,6 +44,7 @@ interface SettingsPanelProps {
   onDownloadGcode: () => void
   /** 現在の設定一式(保存ダイアログで使う) */
   settingsBundle: SettingsBundle
+  onPathOptionsChange: (patch: Partial<PathOptions>) => void
   /** プリセットをロードした結果を各設定へ反映する */
   onLoadSettingsBundle: (bundle: SettingsBundle, name: string) => void
   /** 現在読み込んでいる設定プリセット名(未ロードならnull) */
@@ -50,6 +52,14 @@ interface SettingsPanelProps {
   /** 保存した設定プリセット名を「現在読み込んでいる設定」として反映する */
   onSettingsNameChange: (name: string) => void
 }
+
+const PATH_OPTIONS: { key: keyof PathOptions; label: string }[] = [
+  { key: 'optimizePaths', label: 'パス処理を有効にする' },
+  { key: 'joinPaths', label: 'パスを結合する' },
+  { key: 'optimizeTravel', label: 'ペンアップ移動を最適化する' },
+  { key: 'reorderPaths', label: 'パスを並び替える' },
+  { key: 'reversePaths', label: 'パスの方向反転を許可する' },
+]
 
 export function SettingsPanel({
   settings,
@@ -76,6 +86,7 @@ export function SettingsPanel({
   boundsWarningCount,
   onDownloadGcode,
   settingsBundle,
+  onPathOptionsChange,
   onLoadSettingsBundle,
   currentSettingsName,
   onSettingsNameChange,
@@ -88,7 +99,13 @@ export function SettingsPanel({
   const [isHelpOpen, setIsHelpOpen] = useState(getShowHelpOnStartup)
   const [showHelpOnStartup, setShowHelpOnStartupState] =
     useState(getShowHelpOnStartup)
-  const { setValidity } = useInvalidFields(onSettingsInvalidChange)
+  const [formRevision, setFormRevision] = useState(0)
+  const { setValidity, retainOnly } = useInvalidFields(onSettingsInvalidChange)
+  const handleLoadSettings = (bundle: SettingsBundle, name: string): void => {
+    retainOnly(new Set())
+    setFormRevision((revision) => revision + 1)
+    onLoadSettingsBundle(bundle, name)
+  }
 
   return (
     <section className="panel panel-settings">
@@ -119,7 +136,7 @@ export function SettingsPanel({
           boundsWarningCount={boundsWarningCount}
           onDownloadGcode={onDownloadGcode}
           settingsBundle={settingsBundle}
-          onLoadSettingsBundle={onLoadSettingsBundle}
+          onLoadSettingsBundle={handleLoadSettings}
           currentSettingsName={currentSettingsName}
           onSettingsNameChange={onSettingsNameChange}
         />
@@ -146,6 +163,7 @@ export function SettingsPanel({
         </div>
 
         <div
+          key={`svg-${formRevision}`}
           role="tabpanel"
           className="settings-tabpanel"
           hidden={activeTab !== 'svg'}
@@ -229,7 +247,25 @@ export function SettingsPanel({
           </div>
 
           <div className="settings-group">
-            <h3>パス結合</h3>
+            <h3>パス処理</h3>
+            {PATH_OPTIONS.map(({ key, label }) => (
+              <label key={key} className="settings-checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={settingsBundle.pathOptions[key]}
+                  disabled={
+                    (key !== 'optimizePaths' &&
+                      !settingsBundle.pathOptions.optimizePaths) ||
+                    (key === 'reorderPaths' &&
+                      !settingsBundle.pathOptions.optimizeTravel)
+                  }
+                  onChange={(e) =>
+                    onPathOptionsChange({ [key]: e.target.checked })
+                  }
+                />
+                {label}
+              </label>
+            ))}
             <NumberField
               label="通常ストローク最小長(mm)"
               value={minStrokeLengthMm}
@@ -261,6 +297,7 @@ export function SettingsPanel({
         </div>
 
         <div
+          key={`gcode-${formRevision}`}
           role="tabpanel"
           className="settings-tabpanel"
           hidden={activeTab !== 'gcode'}

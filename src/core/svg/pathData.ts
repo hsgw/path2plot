@@ -30,7 +30,9 @@ class ArgScanner {
     if (!m || m[0] === '')
       throw new Error(`パスの数値解析に失敗しました: "${rest.slice(0, 20)}"`)
     this.pos += m[0].length
-    return Number(m[0])
+    const value = Number(m[0])
+    if (!Number.isFinite(value)) throw new Error('パスの座標が範囲外です')
+    return value
   }
 
   nextFlag(): number {

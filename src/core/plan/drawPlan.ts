@@ -56,6 +56,37 @@ function resolveUnitOrder(
   }
 }
 
+function* materializeUnits(
+  units: DrawUnit[],
+  strokes: ParsedStroke[],
+  unitOrder: UnitOrder | null,
+) {
+  const { order, reversed, innerOrders } = resolveUnitOrder(
+    unitOrder,
+    units.length,
+  )
+  for (const [index, unitIndex] of order.entries()) {
+    yield materializeDrawUnit(
+      units[unitIndex],
+      strokes,
+      reversed[index],
+      innerOrders?.[index] ?? null,
+    )
+  }
+}
+
+export function buildDrawGroups(
+  units: DrawUnit[],
+  strokes: ParsedStroke[],
+  unitOrder: UnitOrder | null,
+): Point[][] {
+  const groups: Point[][] = []
+  for (const unit of materializeUnits(units, strokes, unitOrder)) {
+    for (const segment of unit.gcodeSegments) groups.push(segment)
+  }
+  return groups
+}
+
 export function buildDrawPlan(
   units: DrawUnit[],
   strokes: ParsedStroke[],
@@ -65,11 +96,6 @@ export function buildDrawPlan(
   /** 個別上書きが設定済みのfill idの集合 */
   overriddenFillIds: Set<string>,
 ): DrawPlan {
-  const { order, reversed, innerOrders } = resolveUnitOrder(
-    unitOrder,
-    units.length,
-  )
-
   const listEntries: ListEntry[] = []
   const previewSegments: PreviewSegment[] = []
   const segmentCountPrefix: number[] = [0]
@@ -83,14 +109,10 @@ export function buildDrawPlan(
     segmentCountPrefix.push(segmentCountPrefix.at(-1)! + segmentCount)
   }
 
-  order.forEach((unitIndex, blockId) => {
-    const unit = materializeDrawUnit(
-      units[unitIndex],
-      strokes,
-      reversed[blockId],
-      innerOrders?.[blockId] ?? null,
-    )
-    drawGroups.push(...unit.gcodeSegments)
+  let blockId = -1
+  for (const unit of materializeUnits(units, strokes, unitOrder)) {
+    blockId++
+    for (const segment of unit.gcodeSegments) drawGroups.push(segment)
 
     if (unit.kind === 'joinedStroke') {
       const blockStrokes = unit.strokes ?? []
@@ -105,7 +127,7 @@ export function buildDrawPlan(
         })
       })
       plainStrokeCount += blockStrokes.length
-      return
+      continue
     }
 
     const fillBlock = unit.fillBlock!
@@ -135,7 +157,7 @@ export function buildDrawPlan(
     }
     fillCount++
     fillStrokeCount += unit.gcodeSegments.length
-  })
+  }
 
   return {
     listEntries,

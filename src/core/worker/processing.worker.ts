@@ -21,8 +21,14 @@ self.onmessage = (event: MessageEvent<ProcessingRequest>) => {
     return
   }
 
-  const { requestId, strokes, joinDistanceMm, joinOverrides } = request
+  const { requestId, strokes, joinDistanceMm, joinOverrides, allowReverse } =
+    request
   post({ requestId, type: 'progress', phase: 'join', percent: 0 })
-  const blocks = buildJoinedBlocks(strokes, joinDistanceMm, joinOverrides)
+  const blocks = buildJoinedBlocks(
+    strokes,
+    joinDistanceMm,
+    joinOverrides,
+    allowReverse,
+  )
   post({ requestId, type: 'join-done', blocks })
 }

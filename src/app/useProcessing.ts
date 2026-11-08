@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FillBlock, FillSettings } from '../core/fill/types'
-import { buildJoinedBlocks } from '../core/plan/strokeJoin'
+import { unjoinedBlocks } from '../core/plan/strokeJoin'
 import type { JoinedBlock } from '../core/plan/types'
 import type { SvgParseResult } from '../core/svg/types'
 import type {
   ProcessingPhase,
-  ProcessingRequest,
   ProcessingResponse,
+  FillProcessingRequest,
+  JoinProcessingRequest,
 } from '../core/worker/protocol'
 
 const EMPTY_FILL_BLOCKS: FillBlock[] = []
@@ -22,9 +23,12 @@ export const EMPTY_FILL_OVERRIDES: Map<
   Partial<FillSettings>
 > = new Map()
 
-/** 「どのparseResultに対して計算した結果か」を添えて保持する(ファイル切替直後の不整合を防ぐ) */
-interface ProcessedFor<T> {
-  parseResult: SvgParseResult
+type FillInput = Omit<FillProcessingRequest, 'requestId'>
+type JoinInput = Omit<JoinProcessingRequest, 'requestId'>
+
+/** 計算対象を添えて保持し、ファイルや設定の切り替え直後に古い結果を使用しない。 */
+interface ProcessedFor<Input, T> {
+  input: Input
   value: T
 }
 
@@ -34,6 +38,8 @@ interface UseProcessingArgs {
   fillOverrides: Map<string, Partial<FillSettings>>
   joinDistanceMm: number
   joinOverrides: Map<string, boolean>
+  joinActivated: boolean
+  allowReverse: boolean
 }
 
 export interface ProcessingState {
@@ -45,19 +51,14 @@ export interface ProcessingState {
   isProcessing: boolean
   phase: ProcessingPhase | null
   percent: number
-  /** 「パス結合」ボタン: 現在のparseResultに対して結合処理を有効化する */
-  activateJoin: () => void
-  resetJoin: () => void
 }
 
 /**
  * 塗りブロック生成(buildFillBlocks)・端点結合(buildJoinedBlocks、FR-14)はいずれも重い処理のため、
- * メインスレッドをブロックしないようWeb Workerにオフロードする。結果は「どのparseResultに対する
- * 計算か」とセットで保持し、現在のparseResultと一致する場合のみ有効な結果として扱う。
+ * メインスレッドをブロックしないようWeb Workerにオフロードする。
  *
  * fillとjoinは互いに独立したリクエスト系統として扱う: fillは設定変更に追従して自動実行される一方、
- * joinはファイル読込直後に自動実行せず「パス結合」ボタン押下時のみ実行する(読込直後にパス結合・
- * 書き順最適化が勝手に走らないようにする、という要件のため)。
+ * joinは結合を有効にしている間だけ実行する。
  */
 export function useProcessing({
   parseResult,
@@ -65,35 +66,51 @@ export function useProcessing({
   fillOverrides,
   joinDistanceMm,
   joinOverrides,
+  joinActivated,
+  allowReverse,
 }: UseProcessingArgs): ProcessingState {
   const [fillProcessed, setFillProcessed] = useState<ProcessedFor<
+    FillInput,
     FillBlock[]
   > | null>(null)
   const [joinProcessed, setJoinProcessed] = useState<ProcessedFor<
+    JoinInput,
     JoinedBlock[]
   > | null>(null)
   const [fillPercent, setFillPercent] = useState(0)
   const [joinPercent, setJoinPercent] = useState(0)
 
-  /**
-   * joinActivatedForは「パス結合」ボタン押下時点のparseResultへの参照。現在のparseResultと
-   * 一致する間だけ結合処理が有効(=joinActivated)とみなす。ファイル再読込・パース設定変更で
-   * parseResultの参照が変わると自動的にfalseへ戻るため、専用のリセットeffectが不要
-   * (effect経由のリセットだと、同一コミット内で他のeffectが更新前の値を読んでしまう
-   * タイミング問題が起きうる)
-   */
-  const [joinActivatedFor, setJoinActivatedFor] =
-    useState<SvgParseResult | null>(null)
-  const joinActivated =
-    joinActivatedFor !== null && joinActivatedFor === parseResult
+  const fillInput = useMemo<FillInput | null>(
+    () =>
+      parseResult && {
+        kind: 'fill',
+        fillCandidates: parseResult.fillCandidates,
+        fillSettings,
+        fillOverrides,
+      },
+    [parseResult, fillSettings, fillOverrides],
+  )
+  const joinInput = useMemo<JoinInput | null>(
+    () =>
+      joinActivated && parseResult
+        ? {
+            kind: 'join',
+            strokes: parseResult.strokes,
+            joinDistanceMm,
+            joinOverrides,
+            allowReverse,
+          }
+        : null,
+    [joinActivated, parseResult, joinDistanceMm, joinOverrides, allowReverse],
+  )
 
   // fill/joinそれぞれ独立にrequestIdを持ち、返信のrequestIdが最新のリクエストと一致しない場合
   // (設定を素早く連続変更した場合)は古い結果として無視する
   const workerRef = useRef<Worker | null>(null)
   const fillRequestIdRef = useRef(0)
   const joinRequestIdRef = useRef(0)
-  const pendingFillParseResultRef = useRef<SvgParseResult | null>(null)
-  const pendingJoinParseResultRef = useRef<SvgParseResult | null>(null)
+  const pendingFillInput = useRef<FillInput | null>(null)
+  const pendingJoinInput = useRef<JoinInput | null>(null)
 
   useEffect(() => {
     const worker = new Worker(
@@ -116,10 +133,10 @@ export function useProcessing({
       message: Extract<ProcessingResponse, { type: 'fill-done' }>,
     ): void => {
       if (message.requestId !== fillRequestIdRef.current) return
-      const forParseResult = pendingFillParseResultRef.current
-      if (forParseResult === null) return
+      const input = pendingFillInput.current
+      if (input === null) return
       setFillProcessed({
-        parseResult: forParseResult,
+        input,
         value: message.fillBlocks,
       })
     }
@@ -127,9 +144,9 @@ export function useProcessing({
       message: Extract<ProcessingResponse, { type: 'join-done' }>,
     ): void => {
       if (message.requestId !== joinRequestIdRef.current) return
-      const forParseResult = pendingJoinParseResultRef.current
-      if (forParseResult === null) return
-      setJoinProcessed({ parseResult: forParseResult, value: message.blocks })
+      const input = pendingJoinInput.current
+      if (input === null) return
+      setJoinProcessed({ input, value: message.blocks })
     }
     worker.onmessage = (event: MessageEvent<ProcessingResponse>) => {
       const message = event.data
@@ -149,77 +166,44 @@ export function useProcessing({
   }, [])
 
   useEffect(() => {
-    if (parseResult === null) {
-      setFillProcessed(null)
-      return
-    }
+    pendingFillInput.current = fillInput
+    if (!fillInput) return
     const worker = workerRef.current
     if (!worker) return
     const requestId = ++fillRequestIdRef.current
-    pendingFillParseResultRef.current = parseResult
     setFillPercent(0)
-    const request: ProcessingRequest = {
-      kind: 'fill',
-      requestId,
-      fillCandidates: parseResult.fillCandidates,
-      fillSettings,
-      fillOverrides,
-    }
-    worker.postMessage(request)
-  }, [parseResult, fillSettings, fillOverrides])
+    worker.postMessage({ ...fillInput, requestId })
+  }, [fillInput])
 
   useEffect(() => {
-    if (!joinActivated || parseResult === null) return
+    pendingJoinInput.current = joinInput
+    if (!joinInput) return
     const worker = workerRef.current
     if (!worker) return
     const requestId = ++joinRequestIdRef.current
-    pendingJoinParseResultRef.current = parseResult
     setJoinPercent(0)
-    const request: ProcessingRequest = {
-      kind: 'join',
-      requestId,
-      strokes: parseResult.strokes,
-      joinDistanceMm,
-      joinOverrides,
-    }
-    worker.postMessage(request)
-  }, [joinActivated, parseResult, joinDistanceMm, joinOverrides])
+    worker.postMessage({ ...joinInput, requestId })
+  }, [joinInput])
 
   const isFillProcessing =
-    parseResult !== null && fillProcessed?.parseResult !== parseResult
+    fillInput !== null && fillProcessed?.input !== fillInput
   const isJoinProcessing =
-    joinActivated &&
-    parseResult !== null &&
-    joinProcessed?.parseResult !== parseResult
+    joinInput !== null && joinProcessed?.input !== joinInput
 
   const fillBlocks =
-    fillProcessed?.parseResult === parseResult && fillProcessed !== null
-      ? fillProcessed.value
-      : EMPTY_FILL_BLOCKS
+    fillProcessed?.input === fillInput ? fillProcessed.value : EMPTY_FILL_BLOCKS
 
-  // パス結合が未実行の間は、各ストロークを個別ブロックとして扱う(距離0・上書きなしでの
-  // buildJoinedBlocksはO(n)の単純な変換のためメインスレッドで同期的に計算できる)
-  const unjoinedBlocks = useMemo(
-    () =>
-      buildJoinedBlocks(parseResult?.strokes ?? [], 0, EMPTY_JOIN_OVERRIDES),
+  const separateBlocks = useMemo(
+    () => unjoinedBlocks(parseResult?.strokes ?? []),
     [parseResult],
   )
   const blocks =
-    joinActivated && joinProcessed?.parseResult === parseResult
-      ? joinProcessed.value
-      : unjoinedBlocks
-
-  const activateJoin = useCallback((): void => {
-    setJoinActivatedFor(parseResult)
-  }, [parseResult])
-  const resetJoin = useCallback((): void => {
-    setJoinActivatedFor(null)
-  }, [])
+    joinProcessed?.input === joinInput ? joinProcessed.value : separateBlocks
 
   return {
     fillBlocks,
     blocks,
-    joinActivated,
+    joinActivated: joinInput !== null,
     isProcessing: isFillProcessing || isJoinProcessing,
     phase: isFillProcessing ? 'fill' : isJoinProcessing ? 'join' : null,
     percent: isFillProcessing
@@ -227,7 +211,5 @@ export function useProcessing({
       : isJoinProcessing
         ? joinPercent
         : 0,
-    activateJoin,
-    resetJoin,
   }
 }

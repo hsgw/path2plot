@@ -1,3 +1,4 @@
+import type { Element } from '@xmldom/xmldom'
 import type { ViewBox } from '../geometry/types'
 
 function parseLength(value: string | null): number | undefined {

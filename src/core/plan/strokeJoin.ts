@@ -65,11 +65,50 @@ export function buildJoinedBlocks(
   strokes: ParsedStroke[],
   joinDistanceMm: number,
   overrides: Map<string, boolean>,
+  allowReverse = true,
 ): JoinedBlock[] {
+  if (!allowReverse)
+    return buildForwardBlocks(strokes, joinDistanceMm, overrides)
+  if (joinDistanceMm <= 0 && overrides.size === 0)
+    return unjoinedBlocks(strokes)
   const n = strokes.length
   const candidates = enumerateCandidates(strokes, joinDistanceMm, overrides)
   const links = selectLinks(n, candidates)
   return buildBlocks(n, links)
+}
+
+export function unjoinedBlocks(strokes: ParsedStroke[]): JoinedBlock[] {
+  return strokes.map((_, strokeIndex) => ({
+    members: [{ strokeIndex, reversed: false }],
+  }))
+}
+
+/** 方向を維持する場合は、出現順で隣り合う終点→始点だけを結合する。 */
+function buildForwardBlocks(
+  strokes: ParsedStroke[],
+  joinDistanceMm: number,
+  overrides: Map<string, boolean>,
+): JoinedBlock[] {
+  const blocks: JoinedBlock[] = []
+  for (let strokeIndex = 0; strokeIndex < strokes.length; strokeIndex++) {
+    const member = { strokeIndex, reversed: false }
+    const current = strokes[strokeIndex]
+    const previous = strokes[strokeIndex - 1]
+    if (previous) {
+      const override = overrides.get(joinOverrideKey(previous.id, current.id))
+      if (
+        override ??
+        (joinDistanceMm > 0 &&
+          distance(previous.points.at(-1)!, current.points[0]) <=
+            joinDistanceMm)
+      ) {
+        blocks.at(-1)!.members.push(member)
+        continue
+      }
+    }
+    blocks.push({ members: [member] })
+  }
+  return blocks
 }
 
 /** 既存の走査順で候補ペアを列挙し、ペアごとの最短端点組み合わせを保持する。 */

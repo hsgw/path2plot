@@ -1,5 +1,6 @@
 import type { GcodeSettings, GcodeTemplates } from '../../core/gcode/types'
 import { InfoHint } from '../common/InfoHint'
+import { GCODE_MINIMUMS } from '../../core/settingsFile'
 import { NumberField } from '../common/NumberField'
 import { useInvalidFields } from './useInvalidFields'
 
@@ -70,6 +71,7 @@ export function GcodeSettingsPanel({
       label={label}
       value={settings[key]}
       step={step}
+      min={GCODE_MINIMUMS[key]}
       hint={hint}
       onCommit={(value) => onSettingsChange({ ...settings, [key]: value })}
       onValidityChange={(valid) => setValidity(key, label, valid)}

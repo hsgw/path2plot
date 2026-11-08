@@ -9,6 +9,8 @@ interface SettingsPresetMenuProps {
   onLoadPreset: (name: string) => void
   onOpenSaveDialog: () => void
   onOpenEditDialog: () => void
+  onImportConfig: () => void
+  onExportConfig: () => void
 }
 
 /**
@@ -22,6 +24,8 @@ export function SettingsPresetMenu({
   onLoadPreset,
   onOpenSaveDialog,
   onOpenEditDialog,
+  onImportConfig,
+  onExportConfig,
 }: SettingsPresetMenuProps) {
   const triggerRef = useRef<HTMLButtonElement>(null)
   const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null)
@@ -62,6 +66,14 @@ export function SettingsPresetMenu({
             onOpenEditDialog()
             closeMenu()
           }}
+          onImportConfig={() => {
+            onImportConfig()
+            closeMenu()
+          }}
+          onExportConfig={() => {
+            onExportConfig()
+            closeMenu()
+          }}
           onClose={closeMenu}
         />
       )}
@@ -75,6 +87,8 @@ function SettingsPresetMenuPanel({
   onLoadPreset,
   onOpenSaveDialog,
   onOpenEditDialog,
+  onImportConfig,
+  onExportConfig,
   onClose,
 }: {
   anchor: { x: number; y: number }
@@ -82,6 +96,8 @@ function SettingsPresetMenuPanel({
   onLoadPreset: (name: string) => void
   onOpenSaveDialog: () => void
   onOpenEditDialog: () => void
+  onImportConfig: () => void
+  onExportConfig: () => void
   onClose: () => void
 }) {
   const menuRef = useRef<HTMLDivElement>(null)
@@ -127,6 +143,23 @@ function SettingsPresetMenuPanel({
         onClick={onOpenEditDialog}
       >
         編集…
+      </button>
+      <div className="settings-preset-menu-divider" />
+      <button
+        type="button"
+        role="menuitem"
+        className="menu-item-base settings-preset-menu-item"
+        onClick={onImportConfig}
+      >
+        JSONをインポート…
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        className="menu-item-base settings-preset-menu-item"
+        onClick={onExportConfig}
+      >
+        JSONをエクスポート
       </button>
     </div>,
     document.body,

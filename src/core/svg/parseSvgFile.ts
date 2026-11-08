@@ -1,3 +1,4 @@
+import { DOMParser, onWarningStopParsing, type Element } from '@xmldom/xmldom'
 import type { Matrix2D } from '../geometry/types'
 import { multiply, translate } from '../geometry/matrix'
 import type { FillCandidate } from '../fill/types'
@@ -57,7 +58,7 @@ function extractLineColumn(message: string): {
   column?: number
 } {
   const lineMatch = /line[^\d]{0,15}(\d+)/i.exec(message)
-  const columnMatch = /column[^\d]{0,15}(\d+)/i.exec(message)
+  const columnMatch = /col(?:umn)?[^\d]{0,15}(\d+)/i.exec(message)
   return {
     line: lineMatch ? Number(lineMatch[1]) : undefined,
     column: columnMatch ? Number(columnMatch[1]) : undefined,
@@ -82,6 +83,17 @@ function emitShape(
   if (localCommands.length === 0) return
 
   const transformed = transformPathCommands(localCommands, matrix)
+  const isFinitePoint = ({ x, y }: { x: number; y: number }) =>
+    Number.isFinite(x) && Number.isFinite(y)
+  for (const command of transformed) {
+    if (
+      (command.type !== 'Z' && !isFinitePoint(command.point)) ||
+      (command.type === 'C' &&
+        (!isFinitePoint(command.c1) || !isFinitePoint(command.c2)))
+    ) {
+      throw new Error('パスの座標が範囲外です')
+    }
+  }
   const polylines = pathCommandsToPolylines(transformed, ctx.toleranceMm)
 
   if (isStrokeVisible(state)) {
@@ -112,7 +124,10 @@ function emitShape(
 }
 
 function walk(el: Element, inherited: InheritedState, ctx: WalkContext): void {
-  const tag = el.tagName
+  const tag =
+    el.namespaceURI === 'http://www.w3.org/2000/svg'
+      ? (el.localName ?? el.tagName)
+      : el.tagName
   const index = ctx.counter.value++
 
   if (isDisplayNone(el)) return
@@ -164,7 +179,17 @@ function walk(el: Element, inherited: InheritedState, ctx: WalkContext): void {
   if (!strokeFillState.visible) return
   if (!hasVisibleStrokeOrFill(strokeFillState)) return
 
-  emitShape(el, tag, elementId, strokeFillState, matrix, ctx)
+  try {
+    emitShape(el, tag, elementId, strokeFillState, matrix, ctx)
+  } catch (error) {
+    ctx.errors.push({
+      kind: 'parse-error',
+      message: error instanceof Error ? error.message : String(error),
+      elementTag: tag,
+      elementId,
+      elementIndex: index,
+    })
+  }
 }
 
 /** SVGファイルの文字列を解析し、プリンタ座標系(mm)のストローク一覧・塗り候補・エラー一覧を返す */
@@ -172,11 +197,22 @@ export function parseSvgFile(
   svgText: string,
   settings: ParseSettings,
 ): SvgParseResult {
-  const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml')
-
-  const parserErrorEl = doc.getElementsByTagName('parsererror')[0]
-  if (parserErrorEl) {
-    const message = parserErrorEl.textContent ?? 'SVGの解析に失敗しました'
+  let doc
+  try {
+    doc = new DOMParser({ onError: onWarningStopParsing }).parseFromString(
+      svgText,
+      'image/svg+xml',
+    )
+    const root = doc.documentElement
+    if (
+      !root ||
+      root.localName !== 'svg' ||
+      (root.namespaceURI && root.namespaceURI !== 'http://www.w3.org/2000/svg')
+    ) {
+      throw new Error('ルート要素がSVGではありません')
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
     const { line, column } = extractLineColumn(message)
     return {
       strokes: [],
@@ -186,7 +222,7 @@ export function parseSvgFile(
     }
   }
 
-  const svgEl = doc.documentElement
+  const svgEl = doc.documentElement!
   const viewBox = parseViewBox(svgEl)
   const scale = computeScaleMmPerUnit(settings.dpi, settings.scaleFactor)
   const printerMatrix = multiply(

@@ -1,3 +1,4 @@
+import type { Document, Element } from '@xmldom/xmldom'
 import { getPresentationValue } from './styleResolve'
 
 /**

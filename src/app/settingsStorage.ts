@@ -1,49 +1,34 @@
-import type { FillSettings } from '../core/fill/types'
 import {
   DEFAULT_GCODE_SETTINGS,
   PRUSA_PEN_GCODE_SETTINGS,
-  type GcodeSettings,
 } from '../core/gcode/types'
-import type { ParseSettings } from '../core/svg/types'
-import { DEFAULT_PARSE_SETTINGS } from '../core/svg/types'
-import { DEFAULT_FILL_SETTINGS } from '../core/fill/types'
-import { DEFAULT_JOIN_DISTANCE_MM } from '../core/plan/strokeJoin'
+import {
+  createDefaultSettings,
+  DEFAULT_PATH_OPTIONS,
+  type SettingsBundle,
+} from '../core/settingsFile'
 
-/** 保存/ロード対象となる設定一式(現在読み込み中のSVGやストローク並び順は含まない) */
-export interface SettingsBundle {
-  parseSettings: ParseSettings
-  gcodeSettings: GcodeSettings
-  fillSettings: FillSettings
-  joinDistanceMm: number
-  penWidthMm: number
-  /** 通常ストロークの最小総延長(mm)。旧プリセットでは0として扱う */
-  minStrokeLengthMm?: number
-}
+export type { SettingsBundle } from '../core/settingsFile'
+
+type StoredSettingsBundle = Omit<
+  SettingsBundle,
+  'minStrokeLengthMm' | 'pathOptions'
+> &
+  Partial<Pick<SettingsBundle, 'minStrokeLengthMm' | 'pathOptions'>>
 
 interface SettingsStore {
   /** 起動時に自動ロードするプリセット名。未設定ならnull */
   defaultName: string | null
-  presets: Record<string, SettingsBundle>
+  presets: Record<string, StoredSettingsBundle>
 }
 
 const STORAGE_KEY = 'path2plot.settingsPresets'
 const MIGRATION_KEY = 'path2plot.settingsPresets.initialPresets.v1'
 const DEFAULT_FLIP_Y_MIGRATION_KEY = 'path2plot.settingsPresets.defaultFlipY.v1'
 
-function createInitialBundle(gcodeSettings: GcodeSettings): SettingsBundle {
-  return {
-    parseSettings: { ...DEFAULT_PARSE_SETTINGS },
-    gcodeSettings,
-    fillSettings: { ...DEFAULT_FILL_SETTINGS },
-    joinDistanceMm: DEFAULT_JOIN_DISTANCE_MM,
-    penWidthMm: 0,
-    minStrokeLengthMm: 0,
-  }
-}
-
 const INITIAL_PRESETS: Record<string, SettingsBundle> = {
-  default: createInitialBundle(DEFAULT_GCODE_SETTINGS),
-  prusa_pen: createInitialBundle(PRUSA_PEN_GCODE_SETTINGS),
+  default: createDefaultSettings(),
+  prusa_pen: createDefaultSettings(PRUSA_PEN_GCODE_SETTINGS),
 }
 
 function addInitialPresets(store: SettingsStore): void {
@@ -143,13 +128,23 @@ export function loadDefaultSettingsPreset(): SettingsBundle | null {
 }
 
 /** 古い保存済みプリセットに追加設定がない場合は従来値(OFF)へ補完する */
-function normalizePreset(preset: SettingsBundle): SettingsBundle {
+function normalizePreset(preset: StoredSettingsBundle): SettingsBundle {
+  const defaults = createDefaultSettings()
   return {
+    ...defaults,
     ...preset,
-    minStrokeLengthMm: preset.minStrokeLengthMm ?? 0,
+    parseSettings: { ...defaults.parseSettings, ...preset.parseSettings },
+    fillSettings: { ...defaults.fillSettings, ...preset.fillSettings },
+    minStrokeLengthMm: preset.minStrokeLengthMm ?? defaults.minStrokeLengthMm,
+    pathOptions: { ...DEFAULT_PATH_OPTIONS, ...preset.pathOptions },
     gcodeSettings: {
+      ...defaults.gcodeSettings,
       ...preset.gcodeSettings,
-      flipY: preset.gcodeSettings.flipY ?? false,
+      templates: {
+        ...defaults.gcodeSettings.templates,
+        ...preset.gcodeSettings?.templates,
+      },
+      flipY: preset.gcodeSettings?.flipY ?? false,
     },
   }
 }

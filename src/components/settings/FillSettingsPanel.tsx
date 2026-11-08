@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import type { FillPattern, FillSettings } from '../../core/fill/types'
+import { MIN_FILL_SPACING_MM } from '../../core/settingsFile'
 import { NumberField } from '../common/NumberField'
 import { visibleNumberFieldKeys } from './fillFieldKeys'
 import { HatchSettingsFields } from './HatchSettingsFields'
@@ -78,7 +79,7 @@ export function FillSettingsPanel({
           <NumberField
             label={isHatch ? '線間隔(mm)' : 'リング間隔(mm)'}
             value={settings.spacingMm}
-            min={0.01}
+            min={MIN_FILL_SPACING_MM}
             step={0.1}
             onCommit={(spacingMm) => update({ spacingMm })}
             onValidityChange={(valid) =>

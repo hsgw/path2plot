@@ -1,12 +1,16 @@
 import type { FillBlock } from '../fill/types'
 import type { Point } from '../geometry/types'
 import type { ParsedStroke } from '../svg/types'
+import type { PathOptions } from '../settingsFile'
 import { materializeDrawUnit, travelEndpoints } from './drawUnit'
 import {
   exitPointOf,
   greedyOptimizeOrder,
   pickNearest,
+  shouldReverse,
+  DEFAULT_ORDER_OPTIONS,
   type Endpoints,
+  type OrderOptions,
 } from './travelOrder'
 import type { DrawUnit, SequenceOrder, UnitOrder } from './types'
 
@@ -27,6 +31,7 @@ function segmentEndpoints(points: Point[], current: Point): Endpoints {
 function optimizeFillInner(
   fillBlock: FillBlock,
   entry: Point,
+  options: OrderOptions,
 ): { inner: SequenceOrder; exit: Point } {
   const groups = [fillBlock.outlineLoops ?? [], fillBlock.fillChains]
   const order: number[] = []
@@ -36,7 +41,7 @@ function optimizeFillInner(
 
   for (const segments of groups) {
     const endpoints = segments.map((s) => segmentEndpoints(s, current))
-    const result = greedyOptimizeOrder(endpoints, current)
+    const result = greedyOptimizeOrder(endpoints, current, options)
     result.order.forEach((segIndex, i) => {
       order.push(offset + segIndex)
       reversed.push(result.reversed[i])
@@ -65,6 +70,7 @@ export function optimizeDrawOrder(
   units: DrawUnit[],
   strokes: ParsedStroke[],
   start: Point,
+  options: OrderOptions = DEFAULT_ORDER_OPTIONS,
 ): UnitOrder {
   const endpoints = units.map((unit) =>
     travelEndpoints(materializeDrawUnit(unit, strokes, false)),
@@ -75,15 +81,25 @@ export function optimizeDrawOrder(
   const innerOrders: (SequenceOrder | null)[] = []
   let current = start
 
-  while (remaining.length > 0) {
-    const picked = pickNearest(endpoints, remaining, current)
-    const unitIndex = remaining[picked.pos]
-    remaining.splice(picked.pos, 1)
+  for (let i = 0; i < units.length; i++) {
+    const picked = options.reorderPaths
+      ? pickNearest(endpoints, remaining, current, options.reversePaths)
+      : {
+          pos: i,
+          reversed:
+            options.reversePaths && shouldReverse(endpoints[i], current),
+        }
+    const unitIndex = options.reorderPaths ? remaining[picked.pos] : i
+    if (options.reorderPaths) remaining.splice(picked.pos, 1)
     order.push(unitIndex)
 
     const unit = units[unitIndex]
     if (unit.kind === 'fill') {
-      const { inner, exit } = optimizeFillInner(unit.fillBlock, current)
+      const { inner, exit } = optimizeFillInner(
+        unit.fillBlock,
+        current,
+        options,
+      )
       // 向きは内部並び替え側が持つため、ユニット全体の反転フラグは使わない
       reversed.push(false)
       innerOrders.push(inner)
@@ -99,4 +115,19 @@ export function optimizeDrawOrder(
   }
 
   return { order, reversed, innerOrders }
+}
+
+export function configuredDrawOrder(
+  units: DrawUnit[],
+  strokes: ParsedStroke[],
+  options: PathOptions,
+): UnitOrder | null {
+  if (
+    !options.optimizePaths ||
+    !options.optimizeTravel ||
+    (!options.reorderPaths && !options.reversePaths)
+  ) {
+    return null
+  }
+  return optimizeDrawOrder(units, strokes, { x: 0, y: 0 }, options)
 }

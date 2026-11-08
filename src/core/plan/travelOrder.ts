@@ -8,6 +8,13 @@ export interface Endpoints {
   end: Point
 }
 
+export const DEFAULT_ORDER_OPTIONS = { reorderPaths: true, reversePaths: true }
+export type OrderOptions = typeof DEFAULT_ORDER_OPTIONS
+
+export function shouldReverse(unit: Endpoints, current: Point): boolean {
+  return distance(current, unit.end) < distance(current, unit.start)
+}
+
 /**
  * 未訪問(remaining)のうち現在地に最も近いものを1つ選ぶ。
  * posはremaining内の位置、reversedはend側から入る(逆向きに辿る)ことを表す。
@@ -16,6 +23,7 @@ export function pickNearest(
   units: Endpoints[],
   remaining: number[],
   current: Point,
+  allowReverse = true,
 ): { pos: number; reversed: boolean } {
   let bestPos = 0
   let bestReversed = false
@@ -24,7 +32,7 @@ export function pickNearest(
   for (let k = 0; k < remaining.length; k++) {
     const unit = units[remaining[k]]
     const dStart = distance(current, unit.start)
-    const dEnd = distance(current, unit.end)
+    const dEnd = allowReverse ? distance(current, unit.end) : Infinity
     if (dStart < bestDistance) {
       bestDistance = dStart
       bestPos = k
@@ -48,20 +56,26 @@ export function pickNearest(
 export function greedyOptimizeOrder(
   units: Endpoints[],
   start: Point,
+  options: OrderOptions = DEFAULT_ORDER_OPTIONS,
 ): SequenceOrder {
   const remaining = units.map((_, i) => i)
   const order: number[] = []
   const reversed: boolean[] = []
   let current = start
 
-  while (remaining.length > 0) {
-    const picked = pickNearest(units, remaining, current)
-    const chosenIdx = remaining[picked.pos]
+  for (let i = 0; i < units.length; i++) {
+    const picked = options.reorderPaths
+      ? pickNearest(units, remaining, current, options.reversePaths)
+      : {
+          pos: i,
+          reversed: options.reversePaths && shouldReverse(units[i], current),
+        }
+    const chosenIdx = options.reorderPaths ? remaining[picked.pos] : i
     const unit = units[chosenIdx]
     order.push(chosenIdx)
     reversed.push(picked.reversed)
     current = picked.reversed ? unit.start : unit.end
-    remaining.splice(picked.pos, 1)
+    if (options.reorderPaths) remaining.splice(picked.pos, 1)
   }
 
   return { order, reversed }

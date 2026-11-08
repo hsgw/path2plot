@@ -1,3 +1,4 @@
+import type { Element } from '@xmldom/xmldom'
 import type { PathCommand } from './types'
 import { parsePathData } from './pathData'
 import {

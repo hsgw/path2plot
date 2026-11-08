@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { downloadTextFile } from '../../app/downloadFile'
 import type { SettingsBundle } from '../../app/settingsStorage'
 import {
   deleteSettingsPreset,
@@ -8,6 +9,10 @@ import {
   saveSettingsPreset,
   setDefaultSettingsPresetName,
 } from '../../app/settingsStorage'
+import {
+  parseSettingsFile,
+  serializeSettingsFile,
+} from '../../core/settingsFile'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { LoadSettingsDialog } from './LoadSettingsDialog'
 import { SaveSettingsDialog } from './SaveSettingsDialog'
@@ -52,6 +57,8 @@ export function SettingsActions({
   onSettingsNameChange,
 }: SettingsActionsProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const configInputRef = useRef<HTMLInputElement>(null)
+  const [configError, setConfigError] = useState<string | null>(null)
   const [isSaveOpen, setIsSaveOpen] = useState(false)
   const [isLoadOpen, setIsLoadOpen] = useState(false)
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false)
@@ -68,6 +75,38 @@ export function SettingsActions({
   const presetNames = listSettingsPresetNames()
   const defaultPresetName = getDefaultSettingsPresetName()
 
+  const handleImportConfig = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ): Promise<void> => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    try {
+      const bundle = parseSettingsFile(await file.text())
+      onLoadSettingsBundle(bundle, file.name)
+      setConfigError(null)
+    } catch (error) {
+      setConfigError(
+        `設定をインポートできませんでした。 ${error instanceof Error ? error.message : String(error)}`,
+      )
+    }
+  }
+
+  const handleExportConfig = (): void => {
+    try {
+      downloadTextFile(
+        serializeSettingsFile(settingsBundle),
+        'path2plot-settings.json',
+        'application/json;charset=utf-8',
+      )
+      setConfigError(null)
+    } catch (error) {
+      setConfigError(
+        `設定をエクスポートできませんでした。 ${error instanceof Error ? error.message : String(error)}`,
+      )
+    }
+  }
+
   return (
     // ダイアログ群はposition:fixedのオーバーレイだが、CSS上は子孫セレクタでマッチしてしまうため
     // (`.settings-actions button`等)、.settings-actionsの外側の兄弟として描画する
@@ -83,7 +122,22 @@ export function SettingsActions({
             }}
             onOpenSaveDialog={() => setIsSaveOpen(true)}
             onOpenEditDialog={() => setIsLoadOpen(true)}
+            onImportConfig={() => configInputRef.current?.click()}
+            onExportConfig={handleExportConfig}
           />
+          <input
+            type="file"
+            accept=".json,application/json"
+            aria-label="設定JSONファイル"
+            ref={configInputRef}
+            className="settings-file-input-hidden"
+            onChange={(e) => void handleImportConfig(e)}
+          />
+          {configError && (
+            <p role="alert" className="settings-warning-text">
+              {configError}
+            </p>
+          )}
         </div>
 
         <div className="settings-actions-group">
