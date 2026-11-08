@@ -1,6 +1,10 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import './App.css'
-import { downloadTextFile, gcodeFileNameFor } from './app/downloadFile'
+import {
+  downloadTextFile,
+  gcodeFileNameFor,
+  uploadGcodeToMoonraker,
+} from './app/downloadFile'
 import {
   getDefaultSettingsPresetName,
   loadDefaultSettingsPreset,
@@ -192,6 +196,10 @@ function useSvgFileDrop(
 }
 
 function App() {
+  const isPiBuild = import.meta.env.MODE === 'pi'
+  const [isUploadingGcode, setIsUploadingGcode] = useState(false)
+  const uploadInProgressRef = useRef(false)
+  const [uploadMessage, setUploadMessage] = useState<string | null>(null)
   const [svgText, setSvgText] = useState<string | null>(null)
   const [fileName, setFileName] = useState<string | null>(null)
   const {
@@ -410,6 +418,31 @@ function App() {
       gcodeFileNameFor(fileName),
     )
   }
+  const handleUploadGcode = async (): Promise<void> => {
+    if (!canDownloadGcode || uploadInProgressRef.current) return
+    uploadInProgressRef.current = true
+    setIsUploadingGcode(true)
+    setUploadMessage(null)
+    try {
+      const saved = await uploadGcodeToMoonraker(
+        generateGcode(plan.drawGroups, gcodeSettings),
+        gcodeFileNameFor(fileName),
+      )
+      setUploadMessage(
+        saved
+          ? 'Moonrakerのgcodesフォルダに保存しました。印刷は開始していません。'
+          : '保存をキャンセルしました。',
+      )
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : '不明なエラー'
+      setUploadMessage(
+        `Moonrakerへ保存できませんでした: ${detail}。PiのIPアドレスで開き、MoonrakerのCORS設定を確認してください。`,
+      )
+    } finally {
+      uploadInProgressRef.current = false
+      setIsUploadingGcode(false)
+    }
+  }
 
   const fillErrors = useMemo(
     () => processing.fillBlocks.flatMap((fb) => (fb.error ? [fb.error] : [])),
@@ -461,6 +494,10 @@ function App() {
           canDownloadGcode={canDownloadGcode}
           boundsWarningCount={boundsWarnings.length}
           onDownloadGcode={handleDownloadGcode}
+          isPiBuild={isPiBuild}
+          isUploading={isUploadingGcode}
+          uploadMessage={uploadMessage}
+          onUploadGcode={() => void handleUploadGcode()}
           settingsBundle={settingsBundle}
           onLoadSettingsBundle={handleLoadSettingsBundle}
           currentSettingsName={currentSettingsName}

@@ -26,6 +26,10 @@ interface SettingsActionsProps {
   canDownloadGcode: boolean
   boundsWarningCount: number
   onDownloadGcode: () => void
+  isPiBuild: boolean
+  isUploading: boolean
+  uploadMessage: string | null
+  onUploadGcode: () => void
   /** 現在の設定一式(保存ダイアログで使う) */
   settingsBundle: SettingsBundle
   /** プリセットをロードした結果を各設定へ反映する */
@@ -46,6 +50,10 @@ export function SettingsActions({
   canDownloadGcode,
   boundsWarningCount,
   onDownloadGcode,
+  isPiBuild,
+  isUploading,
+  uploadMessage,
+  onUploadGcode,
   settingsBundle,
   onLoadSettingsBundle,
   currentSettingsName,
@@ -125,6 +133,20 @@ export function SettingsActions({
           >
             G-codeをダウンロード
           </button>
+          {isPiBuild && (
+            <button
+              type="button"
+              onClick={onUploadGcode}
+              disabled={!canDownloadGcode || isUploading}
+            >
+              {isUploading ? 'Moonrakerへ保存中…' : 'Moonrakerへ保存'}
+            </button>
+          )}
+          {uploadMessage && (
+            <p role="status" className="settings-warning-text">
+              {uploadMessage}
+            </p>
+          )}
           {boundsWarningCount > 0 && (
             <p className="settings-warning-text">
               はみ出し警告({boundsWarningCount}

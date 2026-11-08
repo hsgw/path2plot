@@ -6,7 +6,9 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite",
+    "dev:pi": "vite --mode pi",
     "build": "tsc -b && vite build",
+    "build:pi": "tsc -b && vite build --mode pi",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest",
