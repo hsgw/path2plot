@@ -42,6 +42,10 @@ interface SettingsPanelProps {
   canDownloadGcode: boolean
   boundsWarningCount: number
   onDownloadGcode: () => void
+  isPiBuild: boolean
+  isUploading: boolean
+  uploadMessage: string | null
+  onUploadGcode: () => void
   /** 現在の設定一式(保存ダイアログで使う) */
   settingsBundle: SettingsBundle
   onPathOptionsChange: (patch: Partial<PathOptions>) => void
@@ -85,6 +89,10 @@ export function SettingsPanel({
   canDownloadGcode,
   boundsWarningCount,
   onDownloadGcode,
+  isPiBuild,
+  isUploading,
+  uploadMessage,
+  onUploadGcode,
   settingsBundle,
   onPathOptionsChange,
   onLoadSettingsBundle,
@@ -135,6 +143,10 @@ export function SettingsPanel({
           canDownloadGcode={canDownloadGcode}
           boundsWarningCount={boundsWarningCount}
           onDownloadGcode={onDownloadGcode}
+          isPiBuild={isPiBuild}
+          isUploading={isUploading}
+          uploadMessage={uploadMessage}
+          onUploadGcode={onUploadGcode}
           settingsBundle={settingsBundle}
           onLoadSettingsBundle={handleLoadSettings}
           currentSettingsName={currentSettingsName}

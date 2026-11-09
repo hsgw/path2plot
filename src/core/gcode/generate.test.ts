@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   PRUSA_PEN_GCODE_SETTINGS,
   type DrawGroup,
   type GcodeSettings,
 } from './types'
 import { generateGcode } from './generate'
+import { uploadGcodeToMoonraker } from '../../app/downloadFile'
 
 const groups: DrawGroup[] = [
   [
@@ -110,5 +111,89 @@ describe('generateGcode', () => {
     const gcode = generateGcode(multi, settings)
     const penDownLine = `G00 Z${settings.penDownZ} F${settings.penFeedRate}`
     expect(gcode.split(penDownLine).length - 1).toBe(2)
+  })
+})
+
+describe('uploadGcodeToMoonraker', () => {
+  const confirm = vi.fn()
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  function setWindow() {
+    vi.stubGlobal('window', {
+      location: { protocol: 'http:', hostname: '192.168.0.31' },
+      confirm,
+    })
+  }
+
+  it('Moonrakerの一覧から同名ファイルを見つけ、上書きを拒否したら送信しない', async () => {
+    setWindow()
+    confirm.mockReturnValueOnce(false)
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ result: [{ path: 'drawing.gcode' }] })),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      uploadGcodeToMoonraker('G1 X1', 'drawing.gcode'),
+    ).resolves.toBe(false)
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://192.168.0.31:7125/server/files/list?root=gcodes',
+    )
+    expect(confirm).toHaveBeenCalledWith(
+      'Moonrakerに「drawing.gcode」が既にあります。上書きしますか？',
+    )
+  })
+
+  it('一覧を確認後、印刷を開始せずG-codeとgcodesルートを送信する', async () => {
+    setWindow()
+    confirm.mockReturnValueOnce(true)
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ result: [{ path: 'drawing.gcode' }] })),
+      )
+      .mockResolvedValueOnce(new Response('{}', { status: 201 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      uploadGcodeToMoonraker('G1 X1', 'drawing.gcode'),
+    ).resolves.toBe(true)
+
+    const [url, options] = fetchMock.mock.calls[1]
+    expect(url).toBe('http://192.168.0.31:7125/server/files/upload')
+    expect(options?.method).toBe('POST')
+    const body = options?.body as FormData
+    expect(body.get('root')).toBe('gcodes')
+    expect(body.get('print')).toBe('false')
+    expect((body.get('file') as File).name).toBe('drawing.gcode')
+    expect(await (body.get('file') as File).text()).toBe('G1 X1')
+  })
+
+  it('一覧取得とアップロードの失敗をエラーにする', async () => {
+    setWindow()
+    const listFailure = vi
+      .fn()
+      .mockResolvedValue(new Response('', { status: 500 }))
+    vi.stubGlobal('fetch', listFailure)
+    await expect(
+      uploadGcodeToMoonraker('G1 X1', 'drawing.gcode'),
+    ).rejects.toThrow('Moonraker応答エラー (500)')
+
+    const uploadFailure = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ result: [] })))
+      .mockResolvedValueOnce(new Response('', { status: 500 }))
+    vi.stubGlobal('fetch', uploadFailure)
+    await expect(
+      uploadGcodeToMoonraker('G1 X1', 'drawing.gcode'),
+    ).rejects.toThrow('Moonraker保存エラー (500)')
   })
 })

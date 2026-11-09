@@ -15,10 +15,23 @@ npm install
 npm run dev
 ```
 
+Raspberry Pi上でMoonrakerへのG-code保存ボタンを有効にする場合は、Pi専用ビルドを使います。
+
+```bash
+npm run build:pi
+npm run dev:pi
+```
+
+Moonrakerは同じホストの7125番ポートへ接続します。ブラウザからの接続を許可するため、MoonrakerのCORS設定でアプリのオリジンを許可してください。確認済み環境では `http://192.168.0.31:8081` は許可されましたが、`http://klipper.local:8081` は許可されませんでした。エラーが出る場合は、PiのIPアドレスでアプリを開いてください。設定変更後はMoonrakerを再起動します。保存先はgcodesフォルダで、保存時に印刷は開始しません。ローカルへのダウンロードも引き続き利用できます。
+
+`npm run dev:pi` はコマンドを実行したマシン上で開発サーバーを起動します。保存先はブラウザで開いたホストと同じなので、ローカルPC上で起動した場合はPiに送信されません。Pi上で起動する場合も、IPアドレスでアクセスできるよう開発サーバーの待受設定が必要です。
+
 ## スクリプト
 
 - `npm run dev` — 開発サーバー起動
+- `npm run dev:pi` — Moonraker保存UI付き開発サーバー
 - `npm run build` — 型チェック + 本番ビルド
+- `npm run build:pi` — Moonraker保存UI付き本番ビルド
 - `npm run build:cli` — 型チェック + Node.js CLIのビルド
 - `npm run test` — テスト実行(Vitest)
 - `npm run lint` — Lint実行(oxlint)
