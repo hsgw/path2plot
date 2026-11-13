@@ -8,21 +8,26 @@ const licenses = await Promise.all(
   }),
 )
 
+const outDir = process.argv[2] ?? 'dist-ssr'
+const mode = process.argv[3] ?? 'production'
+const entry = process.argv[4] ?? 'src/cli/path2plot.ts'
+const fileName = process.argv[5] ?? 'path2plot-cli.mjs'
+
 await build({
   configFile: false,
   define: {
-    'import.meta.env.MODE': JSON.stringify(process.argv[3] ?? 'production'),
+    'import.meta.env.MODE': JSON.stringify(mode),
   },
   ssr: { noExternal: true },
   build: {
-    ssr: 'src/cli/path2plot.ts',
-    mode: process.argv[3] ?? 'production',
+    ssr: entry,
+    mode,
     target: 'node22',
-    outDir: process.argv[2] ?? 'dist-ssr',
+    outDir,
     emptyOutDir: false,
     rolldownOptions: {
       output: {
-        entryFileNames: 'path2plot-cli.mjs',
+        entryFileNames: fileName,
         banner: licenses.join('\n\n'),
       },
     },

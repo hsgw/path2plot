@@ -11,6 +11,7 @@
     "build:pi": "tsc -b && vite build --mode pi",
     "build:cli": "tsc -b && node scripts/build-cli.mjs",
     "build:cli:pi": "tsc -b && node scripts/build-cli.mjs dist-ssr/pi pi",
+    "build:api:pi": "tsc -b && node scripts/build-cli.mjs dist-ssr/pi pi src/api/server.ts path2plot-api.mjs",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest",

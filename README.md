@@ -117,6 +117,91 @@ print(result.stderr, end="")
 
 Pi上のCLIから保存と印刷を続けて行うには、`npm run build:cli:pi` でビルドしたCLIをPiへコピーし、上の引数に `--print` を追加します。CLIは `--output` にG-codeを書き出した後、そのファイル名で同じPiのMoonraker（`127.0.0.1:7125`）へ送信します。Moonrakerに同名ファイルがある場合は、明示的に `--overwrite` を指定したときだけ上書きします。ローカルの出力ファイルは引き続き上書きされません。印刷開始や待機列への追加は標準エラー出力で確認でき、印刷要求に失敗した場合も書き出したファイルは残ります。
 
+## Raspberry Pi の HTTP API
+
+API は Pi の Node.js プロセスで動かし、Nginx の `/path2plot/api/` を経由して呼び出します。保存と印刷は Pi 内の Moonraker（`127.0.0.1:7125`）へ送ります。別の Web アプリのバックエンドから API を呼ぶと、トークンをブラウザに配布せずに連携できます。
+
+### リクエスト
+
+| メソッドとパス                   | 動作                                              |
+| -------------------------------- | ------------------------------------------------- |
+| `GET /path2plot/api/v1/health`   | API プロセスの稼働確認                            |
+| `POST /path2plot/api/v1/convert` | SVG を変換し、G-code テキストを返す               |
+| `POST /path2plot/api/v1/save`    | SVG を変換して Moonraker に保存する               |
+| `POST /path2plot/api/v1/print`   | SVG を変換して Moonraker に保存し、印刷を要求する |
+
+POST には `Content-Type: application/json` が必要です。`PATH2PLOT_API_TOKEN` を設定した場合は `Authorization: Bearer <トークン>` も送ります。`fileName` と `overwrite` は保存・印刷用です。`config` を省略すると、Pi の共有設定 `/usr/local/share/path2plot/defaults.json` を使います。設定を渡す場合は、Web 版からエクスポートした JSON をオブジェクトとして指定します。
+
+`convert` の成功応答は `text/plain` なので `response.text()` で読み取ります。ほかの成功応答は JSON です。POST の本文は 2 MiB までです。
+
+```js
+const response = await fetch('http://192.168.0.31:8081/path2plot/api/v1/save', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path stroke="black" d="M1 2 L8 9"/></svg>',
+    fileName: 'drawing.gcode',
+    overwrite: false,
+  }),
+})
+if (!response.ok) throw new Error((await response.json()).error)
+console.log(await response.json())
+```
+
+保存・印刷の応答には `fileName` と `printStatus` が含まれます。状態は `not_requested`（保存のみ）、`started`（印刷開始）、`queued`（待機列へ追加）、`not_started`（保存済み・未開始）、`unknown`（保存済み・開始状態不明）です。成功応答を受け取った後も、印刷が始まったかどうかは `printStatus` で判断してください。同名ファイルは `overwrite: true` の場合に上書きし、省略時は HTTP 409 を返します。印刷要求の応答が失われた場合は、Moonraker の状態を確認してから再実行してください。
+
+### Pi への配置
+
+リポジトリのルートで `npm ci` と `npm run build:api:pi` を実行します。生成される `dist-ssr/pi/path2plot-api.mjs` を Pi の配置先に置きます。以下は既存の `/home/hsgw/path2plot-deploy/source` でビルドする例です。
+
+`/etc/systemd/system/path2plot-api.service` に以下を設定します。別のユーザーや配置先を使う場合は `User` と `ExecStart` を合わせます。
+
+```ini
+[Unit]
+Description=path2plot HTTP API
+After=network.target
+
+[Service]
+User=hsgw
+EnvironmentFile=-/etc/path2plot-api.env
+ExecStart=/usr/local/bin/node /home/hsgw/path2plot-deploy/source/dist-ssr/pi/path2plot-api.mjs
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+`/etc/path2plot-api.env` は任意です。認証を併用する場合は `PATH2PLOT_API_TOKEN` を設定し、ファイルは root のみ読み取れるようにします。別オリジンのブラウザから直接呼ぶ場合は、呼び出し元のオリジンを `PATH2PLOT_API_ORIGINS` にカンマ区切りで設定します。サーバー間の通信には CORS 設定は不要です。
+
+既存の Nginx の `server` ブロック（この Pi では `/etc/nginx/sites-available/path2plot`）に、次の `location` を追加します。HTTP ではトークンが暗号化されないため、信頼できる LAN 内で使用するか、Nginx で HTTPS を設定してください。
+
+```nginx
+location /path2plot/api/ {
+    allow 127.0.0.1;
+    allow 192.168.0.0/24;
+    # AP モードも使う場合は、実際の AP 用サブネットも allow で追加
+    deny all;
+    client_max_body_size 2m;
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_next_upstream off;
+    proxy_pass http://127.0.0.1:8787;
+}
+```
+
+`allow` には Pi 自身の IP ではなく、呼び出す端末のサブネットを指定します。例の `192.168.0.0/24` は実際の LAN に合わせて変更してください。Pi のアドレスが同じサブネット内で変わっても許可設定はそのまま使えます。AP モードで別のサブネットになる場合は、AP の DHCP プロファイルで配布範囲を固定し、そのサブネットも許可します。呼び出し先の URL は接続中のネットワークで到達できる Pi のアドレスを使います。同じ Nginx で配信するアプリは `/path2plot/api/v1/save` のような相対 URL を使えます。トークンを設定しない場合、許可したネットワークの端末から印刷を要求できます。
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now path2plot-api
+sudo nginx -t && sudo systemctl reload nginx
+curl -fsS http://127.0.0.1:8081/path2plot/api/v1/health
+```
+
+API を再ビルドしたら `sudo systemctl restart path2plot-api` で更新します。
+
 ## 免責事項
 
 本ソフトウェアは無保証で提供されます。本ソフトウェアの利用(生成したG-codeによるペンプロッター等のハードウェアの制御を含む)により生じたいかなる損害についても、作者は一切の責任を負いません。自己責任でご利用ください。
