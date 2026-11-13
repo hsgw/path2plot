@@ -11,7 +11,7 @@ import {
   LEGACY_DEFAULT_GCODE_SETTINGS,
   PRUSA_PEN_GCODE_SETTINGS,
 } from './types'
-import { LEGACY_DEFAULT_SETTINGS } from '../settingsFile'
+import { createDefaultSettings, LEGACY_DEFAULT_SETTINGS } from '../settingsFile'
 
 const memory = new Map<string, string>()
 const localStorageMock = {
@@ -178,5 +178,29 @@ describe('settings preset initialization', () => {
 
     expect(loadSettingsPreset('default')?.gcodeSettings.flipY).toBe(false)
     expect(loadSettingsPreset('default')?.gcodeSettings.drawAccel).toBe(7000)
+  })
+
+  it('旧組み込みdefaultの完全一致だけ原点を更新し、変更済みdefaultは保持する', () => {
+    const previousDefault = createDefaultSettings()
+    previousDefault.gcodeSettings.bedOriginXMm = 3.25
+    previousDefault.gcodeSettings.bedOriginYMm = 14.5
+    const editedDefault = {
+      ...previousDefault,
+      gcodeSettings: { ...previousDefault.gcodeSettings, bedOriginXMm: 4 },
+    }
+    memory.set(
+      'path2plot.settingsPresets',
+      JSON.stringify({
+        defaultName: 'default',
+        presets: { default: previousDefault, edited: editedDefault },
+      }),
+    )
+    memory.set('path2plot.settingsPresets.initialPresets.v1', '1')
+    memory.set('path2plot.settingsPresets.defaultFlipY.v1', '1')
+    memory.set('path2plot.settingsPresets.defaultSettings.v2', '1')
+
+    expect(loadSettingsPreset('default')?.gcodeSettings.bedOriginXMm).toBe(3.5)
+    expect(loadSettingsPreset('default')?.gcodeSettings.bedOriginYMm).toBe(15.5)
+    expect(loadSettingsPreset('edited')?.gcodeSettings.bedOriginXMm).toBe(4)
   })
 })

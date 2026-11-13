@@ -29,6 +29,8 @@ const MIGRATION_KEY = 'path2plot.settingsPresets.initialPresets.v1'
 const DEFAULT_FLIP_Y_MIGRATION_KEY = 'path2plot.settingsPresets.defaultFlipY.v1'
 const DEFAULT_SETTINGS_MIGRATION_KEY =
   'path2plot.settingsPresets.defaultSettings.v2'
+const DEFAULT_ORIGIN_MIGRATION_KEY =
+  'path2plot.settingsPresets.defaultOrigin.v3'
 
 const INITIAL_PRESETS: Record<string, SettingsBundle> = {
   default: createDefaultSettings(),
@@ -49,6 +51,15 @@ function stableValue(value: unknown): unknown {
 
 function sameSettings(a: unknown, b: unknown): boolean {
   return JSON.stringify(stableValue(a)) === JSON.stringify(stableValue(b))
+}
+
+const PREVIOUS_DEFAULT_SETTINGS = {
+  ...INITIAL_PRESETS.default,
+  gcodeSettings: {
+    ...INITIAL_PRESETS.default.gcodeSettings,
+    bedOriginXMm: 3.25,
+    bedOriginYMm: 14.5,
+  },
 }
 
 function addInitialPresets(store: SettingsStore): void {
@@ -90,6 +101,15 @@ function migrateDefaultPreset(store: SettingsStore): void {
       writeStore(store)
     }
     localStorage.setItem(DEFAULT_SETTINGS_MIGRATION_KEY, '1')
+  }
+
+  // 前回の組み込み既定値一式と一致する場合だけ、新しい既定値へ移す。
+  if (localStorage.getItem(DEFAULT_ORIGIN_MIGRATION_KEY) !== '1') {
+    if (sameSettings(store.presets.default, PREVIOUS_DEFAULT_SETTINGS)) {
+      store.presets.default = createDefaultSettings()
+      writeStore(store)
+    }
+    localStorage.setItem(DEFAULT_ORIGIN_MIGRATION_KEY, '1')
   }
 }
 
