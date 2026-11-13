@@ -141,7 +141,7 @@ describe('uploadGcodeToMoonraker', () => {
 
     await expect(
       uploadGcodeToMoonraker('G1 X1', 'drawing.gcode'),
-    ).resolves.toBe(false)
+    ).resolves.toEqual({ saved: false })
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(fetchMock).toHaveBeenCalledWith(
@@ -165,7 +165,7 @@ describe('uploadGcodeToMoonraker', () => {
 
     await expect(
       uploadGcodeToMoonraker('G1 X1', 'drawing.gcode'),
-    ).resolves.toBe(true)
+    ).resolves.toEqual({ saved: true, printStatus: 'not_requested' })
 
     const [url, options] = fetchMock.mock.calls[1]
     expect(url).toBe('http://192.168.0.31:7125/server/files/upload')
@@ -195,5 +195,32 @@ describe('uploadGcodeToMoonraker', () => {
     await expect(
       uploadGcodeToMoonraker('G1 X1', 'drawing.gcode'),
     ).rejects.toThrow('Moonraker保存エラー (500)')
+  })
+
+  it('印刷要求の開始・キュー状態を識別し、開始状態なしはunknownで返す', async () => {
+    const printResponse = (payload: unknown) =>
+      vi
+        .fn()
+        .mockResolvedValueOnce(new Response(JSON.stringify({ result: [] })))
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(payload), { status: 201 }),
+        )
+    for (const [payload, expected] of [
+      [{ print_started: true }, 'started'],
+      [{ print_queued: true }, 'queued'],
+      [{ print_started: false, print_queued: false }, 'not_started'],
+      [null, 'unknown'],
+    ] as const) {
+      const fetchMock = printResponse(payload)
+      vi.stubGlobal('fetch', fetchMock)
+      await expect(
+        uploadGcodeToMoonraker('G1 X1', 'drawing.gcode', {
+          baseUrl: 'http://127.0.0.1:7125',
+          print: true,
+        }),
+      ).resolves.toEqual({ saved: true, printStatus: expected })
+      const form = fetchMock.mock.calls[1][1]?.body as FormData
+      expect(form.get('print')).toBe('true')
+    }
   })
 })

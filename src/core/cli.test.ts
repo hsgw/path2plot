@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
+import { pathToFileURL } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { buildFillBlocks } from './fill/fillBlock'
 import { generateGcode } from './gcode/generate'
@@ -19,10 +20,53 @@ const cli = (...args: string[]) =>
   run(process.execPath, [join(directory, 'path2plot-cli.mjs'), ...args], {
     cwd: directory,
   })
+const cliPi = (...args: string[]) =>
+  run(
+    process.execPath,
+    [
+      '--import',
+      pathToFileURL(join(directory, 'mock-moonraker.mjs')).href,
+      join(directory, 'pi', 'path2plot-cli.mjs'),
+      ...args,
+    ],
+    { cwd: directory },
+  )
+const cliPiWithExisting = (...args: string[]) =>
+  run(
+    process.execPath,
+    [
+      '--import',
+      pathToFileURL(join(directory, 'mock-moonraker.mjs')).href,
+      join(directory, 'pi', 'path2plot-cli.mjs'),
+      ...args,
+    ],
+    { cwd: directory, env: { ...process.env, P2P_MOCK_EXISTING: '1' } },
+  )
 
 beforeAll(async () => {
   directory = await mkdtemp(join(tmpdir(), 'path2plot-cli-'))
   await run(process.execPath, ['scripts/build-cli.mjs', directory])
+  await run(process.execPath, [
+    'scripts/build-cli.mjs',
+    join(directory, 'pi'),
+    'pi',
+  ])
+  await writeFile(
+    join(directory, 'mock-moonraker.mjs'),
+    `import { existsSync } from 'node:fs'
+    globalThis.fetch = async (url, options = {}) => {
+      if (String(url).includes('/server/files/list')) {
+        if (String(url) !== 'http://127.0.0.1:7125/server/files/list?root=gcodes') throw new Error('wrong list URL')
+        const exists = process.env.P2P_MOCK_EXISTING === '1'
+        return new Response(JSON.stringify({ result: exists ? [{ path: 'printed.gcode' }] : [] }))
+      }
+      if (String(url) !== 'http://127.0.0.1:7125/server/files/upload') throw new Error('wrong upload URL')
+      if (options.method !== 'POST' || options.body?.get('print') !== 'true') throw new Error('print upload was not requested')
+      if (!existsSync('printed.gcode')) throw new Error('local output was not written first')
+      return new Response(JSON.stringify({ print_started: true }), { status: 201 })
+    }`,
+    'utf8',
+  )
 }, 30_000)
 
 afterAll(async () => {
@@ -75,6 +119,48 @@ describe('Node CLI', () => {
       stdout: '',
       stderr: expect.stringContaining('--output'),
     })
+    await expect(
+      cli(
+        '--input',
+        'input.svg',
+        '--output',
+        'out.gcode',
+        '--config',
+        'settings.json',
+        '--print',
+      ),
+    ).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining('Pi CLI'),
+    })
+  })
+
+  it('Pi CLIの--printはローカル保存後にMoonrakerへ要求し、衝突時は--overwriteを要求する', async () => {
+    const { args, output } = await prepare(
+      'printed',
+      svg('<path stroke="black" d="M1 2 L3 4"/>'),
+    )
+    const result = await cliPi(...args, '--print')
+    expect(result.stdout).toBe('')
+    expect(result.stderr).toContain('印刷を開始しました')
+    expect(await readFile(output, 'utf8')).toContain('PLOT_END')
+
+    const collision = { args, output }
+    await rm(collision.output)
+    await expect(
+      cliPiWithExisting(...collision.args, '--print'),
+    ).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining('--overwrite'),
+    })
+    expect(await readFile(collision.output, 'utf8')).toContain('PLOT_END')
+    await rm(collision.output)
+    const overwrite = await cliPiWithExisting(
+      ...collision.args,
+      '--print',
+      '--overwrite',
+    )
+    expect(overwrite.stderr).toContain('印刷を開始しました')
   })
 
   it('単一のパスを変換し、計測はstderrに出力して既存ファイルを保持する', async () => {

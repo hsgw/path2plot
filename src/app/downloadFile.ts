@@ -18,13 +18,30 @@ export function gcodeFileNameFor(svgFileName: string | null): string {
   return `${(svgFileName ?? 'output').replace(/\.svg$/i, '')}.gcode`
 }
 
-/** Moonrakerのgcodes領域へ保存する。印刷は開始しない。 */
+export type MoonrakerUploadResult =
+  | { saved: false }
+  | {
+      saved: true
+      printStatus:
+        'not_requested' | 'started' | 'queued' | 'not_started' | 'unknown'
+    }
+
+export interface MoonrakerUploadOptions {
+  baseUrl?: string
+  print?: boolean
+  overwrite?: boolean
+  confirmOverwrite?: (fileName: string) => boolean
+}
+
+/** Moonrakerのgcodes領域へ保存する。print=trueの場合は印刷開始要求も行う。 */
 export async function uploadGcodeToMoonraker(
   text: string,
   fileName: string,
-): Promise<boolean> {
-  // path2plot はPi上の8081等で配信され、Moonrakerは同じホストの7125で待ち受ける。
-  const baseUrl = `${window.location.protocol}//${window.location.hostname}:7125`
+  options: MoonrakerUploadOptions = {},
+): Promise<MoonrakerUploadResult> {
+  const baseUrl =
+    options.baseUrl ??
+    `${window.location.protocol}//${window.location.hostname}:7125`
   const listResponse = await fetch(`${baseUrl}/server/files/list?root=gcodes`)
   if (!listResponse.ok)
     throw new Error(`Moonraker応答エラー (${listResponse.status})`)
@@ -35,22 +52,45 @@ export async function uploadGcodeToMoonraker(
   if (
     listing.result.some((file: { path?: string }) => file.path === fileName)
   ) {
-    if (
-      !window.confirm(
-        `Moonrakerに「${fileName}」が既にあります。上書きしますか？`,
-      )
-    )
-      return false
+    if (options.overwrite !== true) {
+      const confirmOverwrite =
+        options.confirmOverwrite ??
+        ((name: string) =>
+          window.confirm(
+            `Moonrakerに「${name}」が既にあります。上書きしますか？`,
+          ))
+      if (!confirmOverwrite(fileName)) return { saved: false }
+    }
   }
 
   const form = new FormData()
   form.append('file', new File([text], fileName, { type: 'text/plain' }))
   form.append('root', 'gcodes')
-  form.append('print', 'false')
+  form.append('print', options.print ? 'true' : 'false')
   const response = await fetch(`${baseUrl}/server/files/upload`, {
     method: 'POST',
     body: form,
   })
   if (!response.ok) throw new Error(`Moonraker保存エラー (${response.status})`)
-  return true
+  if (!options.print) return { saved: true, printStatus: 'not_requested' }
+
+  let payload: unknown
+  try {
+    payload = await response.json()
+  } catch {
+    // Upload can succeed while its response omits a print status.
+  }
+  if (!payload || typeof payload !== 'object')
+    return { saved: true, printStatus: 'unknown' }
+  const body = payload as Record<string, unknown>
+  const result = (
+    body.result && typeof body.result === 'object' ? body.result : body
+  ) as Record<string, unknown>
+  if (result.print_started === true)
+    return { saved: true, printStatus: 'started' }
+  if (result.print_queued === true)
+    return { saved: true, printStatus: 'queued' }
+  if (result.print_started === false && result.print_queued === false)
+    return { saved: true, printStatus: 'not_started' }
+  return { saved: true, printStatus: 'unknown' }
 }

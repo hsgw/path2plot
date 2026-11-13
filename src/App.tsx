@@ -459,7 +459,7 @@ function App() {
       gcodeFileNameFor(fileName),
     )
   }
-  const handleUploadGcode = async (): Promise<void> => {
+  const handleUploadGcode = async (print = false): Promise<void> => {
     if (!canDownloadGcode || uploadInProgressRef.current) return
     uploadInProgressRef.current = true
     setIsUploadingGcode(true)
@@ -468,12 +468,25 @@ function App() {
       const saved = await uploadGcodeToMoonraker(
         generateGcode(plan.drawGroups, gcodeSettings),
         gcodeFileNameFor(fileName),
+        { print },
       )
-      setUploadMessage(
-        saved
-          ? 'Moonrakerのgcodesフォルダに保存しました。印刷は開始していません。'
-          : '保存をキャンセルしました。',
-      )
+      if (!saved.saved) setUploadMessage('保存をキャンセルしました。')
+      else if (!print)
+        setUploadMessage(
+          'Moonrakerのgcodesフォルダに保存しました。印刷は開始していません。',
+        )
+      else if (saved.printStatus === 'started')
+        setUploadMessage('G-codeを保存し、印刷を開始しました。')
+      else if (saved.printStatus === 'queued')
+        setUploadMessage('G-codeを保存し、印刷キューに追加しました。')
+      else if (saved.printStatus === 'not_started')
+        setUploadMessage(
+          'G-codeは保存されましたが、印刷は開始されませんでした。Moonrakerの状態を確認してください。',
+        )
+      else
+        setUploadMessage(
+          'G-codeは保存されましたが、印刷開始状態を確認できませんでした。',
+        )
     } catch (error) {
       const detail = error instanceof Error ? error.message : '不明なエラー'
       setUploadMessage(
@@ -553,6 +566,7 @@ function App() {
           isUploading={isUploadingGcode}
           uploadMessage={uploadMessage}
           onUploadGcode={() => void handleUploadGcode()}
+          onPrintGcode={() => void handleUploadGcode(true)}
           settingsBundle={{ ...settingsBundle, pathOptions }}
           onPathOptionsChange={handlePathOptionsChange}
           onLoadSettingsBundle={handleApplySettingsBundle}

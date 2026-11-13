@@ -46,6 +46,7 @@ interface SettingsPanelProps {
   isUploading: boolean
   uploadMessage: string | null
   onUploadGcode: () => void
+  onPrintGcode: () => void
   /** 現在の設定一式(保存ダイアログで使う) */
   settingsBundle: SettingsBundle
   onPathOptionsChange: (patch: Partial<PathOptions>) => void
@@ -93,6 +94,7 @@ export function SettingsPanel({
   isUploading,
   uploadMessage,
   onUploadGcode,
+  onPrintGcode,
   settingsBundle,
   onPathOptionsChange,
   onLoadSettingsBundle,
@@ -147,6 +149,7 @@ export function SettingsPanel({
           isUploading={isUploading}
           uploadMessage={uploadMessage}
           onUploadGcode={onUploadGcode}
+          onPrintGcode={onPrintGcode}
           settingsBundle={settingsBundle}
           onLoadSettingsBundle={handleLoadSettings}
           currentSettingsName={currentSettingsName}

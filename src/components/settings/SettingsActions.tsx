@@ -35,6 +35,7 @@ interface SettingsActionsProps {
   isUploading: boolean
   uploadMessage: string | null
   onUploadGcode: () => void
+  onPrintGcode: () => void
   /** 現在の設定一式(保存ダイアログで使う) */
   settingsBundle: SettingsBundle
   /** プリセットをロードした結果を各設定へ反映する */
@@ -59,6 +60,7 @@ export function SettingsActions({
   isUploading,
   uploadMessage,
   onUploadGcode,
+  onPrintGcode,
   settingsBundle,
   onLoadSettingsBundle,
   currentSettingsName,
@@ -70,6 +72,7 @@ export function SettingsActions({
   const [isSaveOpen, setIsSaveOpen] = useState(false)
   const [isLoadOpen, setIsLoadOpen] = useState(false)
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false)
+  const [isPrintConfirmOpen, setIsPrintConfirmOpen] = useState(false)
   // 保存/デフォルト設定/削除のたびにlocalStorageの内容を読み直させるための再描画トリガー
   const [, forceRerender] = useState(0)
 
@@ -188,13 +191,22 @@ export function SettingsActions({
             G-codeをダウンロード
           </button>
           {isPiBuild && (
-            <button
-              type="button"
-              onClick={onUploadGcode}
-              disabled={!canDownloadGcode || isUploading}
-            >
-              {isUploading ? 'Moonrakerへ保存中…' : 'Moonrakerへ保存'}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={onUploadGcode}
+                disabled={!canDownloadGcode || isUploading}
+              >
+                {isUploading ? 'Moonrakerへ保存中…' : 'Moonrakerへ保存'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsPrintConfirmOpen(true)}
+                disabled={!canDownloadGcode || isUploading}
+              >
+                G-codeを保存して印刷
+              </button>
+            </>
           )}
           {uploadMessage && (
             <p role="status" className="settings-warning-text">
@@ -256,6 +268,19 @@ export function SettingsActions({
             setIsResetConfirmOpen(false)
           }}
           onCancel={() => setIsResetConfirmOpen(false)}
+        />
+      )}
+      {isPrintConfirmOpen && (
+        <ConfirmDialog
+          title="印刷の確認"
+          message="G-codeをMoonrakerに保存し、プリンターで印刷を開始します。よろしいですか?"
+          confirmLabel="保存して印刷"
+          danger
+          onConfirm={() => {
+            setIsPrintConfirmOpen(false)
+            onPrintGcode()
+          }}
+          onCancel={() => setIsPrintConfirmOpen(false)}
         />
       )}
     </>

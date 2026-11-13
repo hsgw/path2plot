@@ -10,9 +10,13 @@ const licenses = await Promise.all(
 
 await build({
   configFile: false,
+  define: {
+    'import.meta.env.MODE': JSON.stringify(process.argv[3] ?? 'production'),
+  },
   ssr: { noExternal: true },
   build: {
     ssr: 'src/cli/path2plot.ts',
+    mode: process.argv[3] ?? 'production',
     target: 'node22',
     outDir: process.argv[2] ?? 'dist-ssr',
     emptyOutDir: false,

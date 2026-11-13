@@ -15,24 +15,27 @@ npm install
 npm run dev
 ```
 
-Raspberry Pi上でMoonrakerへのG-code保存ボタンを有効にする場合は、Pi専用ビルドを使います。
+Raspberry Pi上でMoonrakerへのG-code保存・印刷ボタンを有効にする場合は、Pi専用ビルドを使います。
 
 ```bash
 npm run build:pi
 npm run dev:pi
 ```
 
-Moonrakerは同じホストの7125番ポートへ接続します。ブラウザからの接続を許可するため、MoonrakerのCORS設定でアプリのオリジンを許可してください。確認済み環境では `http://192.168.0.31:8081` は許可されましたが、`http://klipper.local:8081` は許可されませんでした。エラーが出る場合は、PiのIPアドレスでアプリを開いてください。設定変更後はMoonrakerを再起動します。保存先はgcodesフォルダで、保存時に印刷は開始しません。ローカルへのダウンロードも引き続き利用できます。
+Moonrakerは同じホストの7125番ポートへ接続します。ブラウザからの接続を許可するため、MoonrakerのCORS設定でアプリのオリジンを許可してください。確認済み環境では `http://192.168.0.31:8081` は許可されましたが、`http://klipper.local:8081` は許可されませんでした。エラーが出る場合は、PiのIPアドレスでアプリを開いてください。設定変更後はMoonrakerを再起動します。
+
+「Moonrakerへ保存」はG-codeをgcodesフォルダに保存します。「G-codeを保存して印刷」は確認後、同じ場所に保存して印刷を要求します。Moonrakerの応答に応じて、印刷開始・待機列への追加・保存のみの結果を表示します。同名ファイルがある場合は上書きを確認します。ローカルへのダウンロードも引き続き利用できます。
 
 `npm run dev:pi` はコマンドを実行したマシン上で開発サーバーを起動します。保存先はブラウザで開いたホストと同じなので、ローカルPC上で起動した場合はPiに送信されません。Pi上で起動する場合も、IPアドレスでアクセスできるよう開発サーバーの待受設定が必要です。
 
 ## スクリプト
 
 - `npm run dev` — 開発サーバー起動
-- `npm run dev:pi` — Moonraker保存UI付き開発サーバー
+- `npm run dev:pi` — Moonraker保存・印刷UI付き開発サーバー
 - `npm run build` — 型チェック + 本番ビルド
-- `npm run build:pi` — Moonraker保存UI付き本番ビルド
+- `npm run build:pi` — Moonraker保存・印刷UI付き本番ビルド
 - `npm run build:cli` — 型チェック + Node.js CLIのビルド
+- `npm run build:cli:pi` — Moonraker印刷対応CLIのビルド（`dist-ssr/pi/path2plot-cli.mjs`）
 - `npm run test` — テスト実行(Vitest)
 - `npm run lint` — Lint実行(oxlint)
 - `npm run format` — Prettierでフォーマット
@@ -111,6 +114,8 @@ print(result.stderr, end="")
 ```
 
 失敗時は `subprocess.CalledProcessError` の `returncode` と `stderr` を確認できます。ARMv7実機での起動・変換時間およびKlipperの描画は実機で確認してください。
+
+Pi上のCLIから保存と印刷を続けて行うには、`npm run build:cli:pi` でビルドしたCLIをPiへコピーし、上の引数に `--print` を追加します。CLIは `--output` にG-codeを書き出した後、そのファイル名で同じPiのMoonraker（`127.0.0.1:7125`）へ送信します。Moonrakerに同名ファイルがある場合は、明示的に `--overwrite` を指定したときだけ上書きします。ローカルの出力ファイルは引き続き上書きされません。印刷開始や待機列への追加は標準エラー出力で確認でき、印刷要求に失敗した場合も書き出したファイルは残ります。
 
 ## 免責事項
 

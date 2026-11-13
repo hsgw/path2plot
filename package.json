@@ -10,6 +10,7 @@
     "build": "tsc -b && vite build",
     "build:pi": "tsc -b && vite build --mode pi",
     "build:cli": "tsc -b && node scripts/build-cli.mjs",
+    "build:cli:pi": "tsc -b && node scripts/build-cli.mjs dist-ssr/pi pi",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest",
