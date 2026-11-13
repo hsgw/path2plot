@@ -121,13 +121,22 @@ export const PRUSA_PEN_GCODE_SETTINGS: GcodeSettings = {
   templates: PRUSA_PEN_GCODE_TEMPLATES,
 }
 
-export const DEFAULT_GCODE_TEMPLATES: GcodeTemplates = {
+export const LEGACY_DEFAULT_GCODE_TEMPLATES: GcodeTemplates = {
   start: 'G90\nG28\nPEN_UP',
   travelMove: 'M204 S{travelAccel}\nG0 X{x} Y{y} F{travelFeedRate}',
   penDown: 'PEN_DOWN',
   drawMove: 'M204 S{drawAccel}\nG1 X{x} Y{y} F{drawFeedRate}',
   penUp: 'PEN_UP',
   end: 'PEN_UP\nPLOT_END',
+}
+
+export const DEFAULT_GCODE_TEMPLATES: GcodeTemplates = {
+  start: 'PLOT_START\nM204 S{travelAccel}\n',
+  travelMove: 'G0 X{x} Y{y} F{travelFeedRate}',
+  penDown: 'M204 S{drawAccel}\nPEN_DOWN',
+  drawMove: 'G1 X{x} Y{y} F{drawFeedRate}',
+  penUp: 'M204 S{travelAccel}\nPEN_UP',
+  end: 'PEN_UP\nPLOT_END\n\n',
 }
 
 /** 新しいペンプロッター向け既定値 */
@@ -138,16 +147,27 @@ export const DEFAULT_GCODE_SETTINGS: GcodeSettings = {
   penDownZ: 19,
   penUpZ: 23,
   travelZ: 30,
-  drawAccel: 7000,
-  travelAccel: 8000,
+  drawAccel: 6000,
+  travelAccel: 6000,
   xyJerk: 10,
   minSegmentLengthMm: 0.1,
   bedWidthMm: 89,
   bedHeightMm: 53,
-  bedOriginXMm: 3,
-  bedOriginYMm: 14,
+  bedOriginXMm: 3.25,
+  bedOriginYMm: 14.5,
   flipY: true,
   parkX: 0,
   parkY: 0,
   templates: DEFAULT_GCODE_TEMPLATES,
+}
+
+/** 更新前の既定値。既存プリセットの移行判定と欠落項目補完にのみ使う。 */
+export const LEGACY_DEFAULT_GCODE_SETTINGS: GcodeSettings = {
+  ...DEFAULT_GCODE_SETTINGS,
+  drawAccel: 7000,
+  travelAccel: 8000,
+  bedOriginXMm: 3,
+  bedOriginYMm: 14,
+  flipY: true,
+  templates: LEGACY_DEFAULT_GCODE_TEMPLATES,
 }

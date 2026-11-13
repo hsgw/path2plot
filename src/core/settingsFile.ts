@@ -1,5 +1,9 @@
 import { DEFAULT_FILL_SETTINGS } from './fill/types'
-import { DEFAULT_GCODE_SETTINGS, type GcodeSettings } from './gcode/types'
+import {
+  DEFAULT_GCODE_SETTINGS,
+  LEGACY_DEFAULT_GCODE_SETTINGS,
+  type GcodeSettings,
+} from './gcode/types'
 import { DEFAULT_JOIN_DISTANCE_MM } from './plan/strokeJoin'
 import { DEFAULT_PARSE_SETTINGS } from './svg/types'
 
@@ -13,7 +17,7 @@ export const DEFAULT_PATH_OPTIONS = {
 
 export type PathOptions = typeof DEFAULT_PATH_OPTIONS
 
-export function createDefaultSettings(gcodeSettings = DEFAULT_GCODE_SETTINGS) {
+function buildSettings(gcodeSettings: GcodeSettings) {
   return {
     parseSettings: { ...DEFAULT_PARSE_SETTINGS },
     gcodeSettings: {
@@ -27,6 +31,37 @@ export function createDefaultSettings(gcodeSettings = DEFAULT_GCODE_SETTINGS) {
     pathOptions: { ...DEFAULT_PATH_OPTIONS },
   }
 }
+
+export function createDefaultSettings() {
+  return {
+    ...buildSettings(DEFAULT_GCODE_SETTINGS),
+    fillSettings: {
+      ...DEFAULT_FILL_SETTINGS,
+      spacingMm: 0.35,
+      fillOffsetMm: 0.175,
+    },
+    joinDistanceMm: 0.35,
+    penWidthMm: 0.35,
+    minStrokeLengthMm: 0.5,
+    pathOptions: {
+      optimizePaths: true,
+      optimizeTravel: true,
+      reorderPaths: true,
+      reversePaths: true,
+      joinPaths: true,
+    },
+  }
+}
+
+/** 更新前の補完値を維持するプリセット生成。保存済み旧設定の読込専用。 */
+export function createLegacySettings(
+  gcodeSettings: GcodeSettings = LEGACY_DEFAULT_GCODE_SETTINGS,
+) {
+  return buildSettings(gcodeSettings)
+}
+
+/** 移行時にだけ使う、更新前の初期プリセット一式。 */
+export const LEGACY_DEFAULT_SETTINGS = createLegacySettings()
 
 export type SettingsBundle = ReturnType<typeof createDefaultSettings>
 export const MIN_FILL_SPACING_MM = 0.01

@@ -1,10 +1,12 @@
 import {
-  DEFAULT_GCODE_SETTINGS,
+  LEGACY_DEFAULT_GCODE_SETTINGS,
   PRUSA_PEN_GCODE_SETTINGS,
 } from '../core/gcode/types'
 import {
+  createLegacySettings,
   createDefaultSettings,
   DEFAULT_PATH_OPTIONS,
+  LEGACY_DEFAULT_SETTINGS,
   type SettingsBundle,
 } from '../core/settingsFile'
 
@@ -25,10 +27,28 @@ interface SettingsStore {
 const STORAGE_KEY = 'path2plot.settingsPresets'
 const MIGRATION_KEY = 'path2plot.settingsPresets.initialPresets.v1'
 const DEFAULT_FLIP_Y_MIGRATION_KEY = 'path2plot.settingsPresets.defaultFlipY.v1'
+const DEFAULT_SETTINGS_MIGRATION_KEY =
+  'path2plot.settingsPresets.defaultSettings.v2'
 
 const INITIAL_PRESETS: Record<string, SettingsBundle> = {
   default: createDefaultSettings(),
-  prusa_pen: createDefaultSettings(PRUSA_PEN_GCODE_SETTINGS),
+  prusa_pen: createLegacySettings(PRUSA_PEN_GCODE_SETTINGS),
+}
+
+function stableValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stableValue)
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, entry]) => [key, stableValue(entry)]),
+    )
+  }
+  return value
+}
+
+function sameSettings(a: unknown, b: unknown): boolean {
+  return JSON.stringify(stableValue(a)) === JSON.stringify(stableValue(b))
 }
 
 function addInitialPresets(store: SettingsStore): void {
@@ -44,23 +64,32 @@ function addInitialPresets(store: SettingsStore): void {
   }
 }
 
-function migrateDefaultFlipY(store: SettingsStore): void {
-  // 既存の default が旧既定値のままなら新しい座標系設定へ移行する。
-  // 他の値が変わっている場合はユーザー編集とみなし、そのまま保持する。
+function migrateDefaultPreset(store: SettingsStore): void {
+  // 以前の移行動作を先に再現する。markerが既にある場合のflipY=falseは編集値として扱う。
   if (localStorage.getItem(DEFAULT_FLIP_Y_MIGRATION_KEY) !== '1') {
     const defaultPreset = store.presets.default
     const settings = defaultPreset?.gcodeSettings
-    const { flipY: _flipY, ...currentSettings } = DEFAULT_GCODE_SETTINGS
-    const { flipY: previousFlipY, ...previousSettings } = settings ?? {}
+    const { flipY: _oldFlipY, ...oldGcodeSettings } = settings ?? {}
+    const { flipY: _legacyFlipY, ...legacyGcodeSettings } =
+      LEGACY_DEFAULT_GCODE_SETTINGS
     if (
       settings &&
-      previousFlipY !== true &&
-      JSON.stringify(previousSettings) === JSON.stringify(currentSettings)
+      settings.flipY !== true &&
+      sameSettings(oldGcodeSettings, legacyGcodeSettings)
     ) {
       settings.flipY = true
       writeStore(store)
     }
     localStorage.setItem(DEFAULT_FLIP_Y_MIGRATION_KEY, '1')
+  }
+
+  // 旧既定値一式と完全一致するdefaultだけを新しい組み込み値へ移す。
+  if (localStorage.getItem(DEFAULT_SETTINGS_MIGRATION_KEY) !== '1') {
+    if (sameSettings(store.presets.default, LEGACY_DEFAULT_SETTINGS)) {
+      store.presets.default = createDefaultSettings()
+      writeStore(store)
+    }
+    localStorage.setItem(DEFAULT_SETTINGS_MIGRATION_KEY, '1')
   }
 }
 
@@ -76,7 +105,7 @@ function readStore(): SettingsStore {
       : { defaultName: null, presets: {} }
 
     addInitialPresets(store)
-    migrateDefaultFlipY(store)
+    migrateDefaultPreset(store)
     return store
   } catch {
     return { defaultName: null, presets: {} }
@@ -129,7 +158,7 @@ export function loadDefaultSettingsPreset(): SettingsBundle | null {
 
 /** 古い保存済みプリセットに追加設定がない場合は従来値(OFF)へ補完する */
 function normalizePreset(preset: StoredSettingsBundle): SettingsBundle {
-  const defaults = createDefaultSettings()
+  const defaults = LEGACY_DEFAULT_SETTINGS
   return {
     ...defaults,
     ...preset,

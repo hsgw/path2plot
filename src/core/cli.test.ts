@@ -88,10 +88,10 @@ describe('Node CLI', () => {
       /SVG読み込み.*\n.*SVG解析.*\n.*パス処理.*\n.*G-code生成.*\n.*合計/,
     )
     const gcode = await readFile(output, 'utf8')
-    expect(gcode).toContain('G0 X1 Y8')
+    expect(gcode).toContain('G0 X3 Y6')
     expect(gcode).toContain('PEN_DOWN')
-    expect(gcode).toContain('G1 X3 Y6')
-    expect(gcode.endsWith('PLOT_END\n')).toBe(true)
+    expect(gcode).toContain('G1 X1 Y8')
+    expect(gcode.endsWith('PLOT_END\n\n\n')).toBe(true)
     await expect(cli(...args)).rejects.toMatchObject({
       code: 1,
       stdout: '',

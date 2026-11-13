@@ -78,13 +78,17 @@ Web版の左上にある設定名のメニューから「JSONをエクスポー�
 | `reorderPaths`   | 移動最適化時にユニットや塗りブロック内のセグメントを並び替える                                              |
 | `reversePaths`   | 移動最適化と端点結合で反転を許可する。結合時は離れた位置に出現するストロークも1ブロックにまとまることがある |
 
-`optimizePaths` と `optimizeTravel` の初期値はtrueで、各処理フラグの初期値はfalseです。塗りは `fillSettings`、曲線の折線近似精度は `parseSettings.bezierToleranceMm`、短い線の除外は最小長の設定で調整します。結合や塗りのストローク別上書きは、読み込んだSVGに紐づく編集です。共有JSONは全体設定とパス処理モードを保存し、インポートするとSVG固有の上書きを解除します。
+組み込みの初期値では、上の5つのパス設定はすべて `true` です。塗りは `fillSettings`、曲線の折線近似精度は `parseSettings.bezierToleranceMm`、短い線の除外は最小長の設定で調整します。結合や塗りのストローク別上書きは、読み込んだSVGに紐づく編集です。共有JSONは全体設定とパス処理モードを保存し、インポートするとSVG固有の上書きを解除します。
 
 SVGはUTF-8のXMLとして読み込みます。標準のXML文字参照を使用でき、独自のDTD実体参照は未対応です。
 
 ### Raspberry PiとPythonから実行する
 
-ビルド用PCで作った `dist-ssr/path2plot-cli.mjs` を Raspberry Pi 3 Model B（Raspbian 13、ARMv7/armhf）へコピーします。CLIの依存はファイルに同梱されるため、Piではインストール済みの `/usr/local/bin/node`（v22.23.4）で実行できます。CLIと設定JSONをたとえば `/opt/path2plot/` に置いた場合は次のように呼び出せます。
+ビルド用PCで作った `dist-ssr/path2plot-cli.mjs` を Raspberry Pi 3 Model B（Raspbian 13、ARMv7/armhf）へコピーします。CLIの依存はファイルに同梱されるため、Piではインストール済みの `/usr/local/bin/node`（v22.23.4）で実行できます。
+
+Raspberry Pi（`klipper`）では、Web版の組み込み初期値をまとめた共有JSONを `/usr/local/share/path2plot/defaults.json` に配置しています。Pi上の別プロジェクトからも、この絶対パスを `--config` に渡して参照できます。`--config` はPiでも必須で、省略すると変換前にエラーで終了します。組み込み初期値の変更を共有JSONに反映するには、ファイルを再出力して更新します。
+
+CLIをたとえば `/opt/path2plot/` に置いた場合は、Pythonから次のように呼び出せます。
 
 ```python
 import subprocess
@@ -95,7 +99,7 @@ result = subprocess.run(
         "/opt/path2plot/path2plot-cli.mjs",
         "--input", "/tmp/input.svg",
         "--output", "/tmp/output.gcode",
-        "--config", "/opt/path2plot/path2plot-settings.json",
+        "--config", "/usr/local/share/path2plot/defaults.json",
         "--timing",
     ],
     check=True,

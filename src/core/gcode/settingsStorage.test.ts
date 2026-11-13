@@ -6,7 +6,12 @@ import {
   loadDefaultSettingsPreset,
   loadSettingsPreset,
 } from '../../app/settingsStorage'
-import { DEFAULT_GCODE_SETTINGS, PRUSA_PEN_GCODE_SETTINGS } from './types'
+import {
+  DEFAULT_GCODE_SETTINGS,
+  LEGACY_DEFAULT_GCODE_SETTINGS,
+  PRUSA_PEN_GCODE_SETTINGS,
+} from './types'
+import { LEGACY_DEFAULT_SETTINGS } from '../settingsFile'
 
 const memory = new Map<string, string>()
 const localStorageMock = {
@@ -34,9 +39,15 @@ describe('settings preset initialization', () => {
       PRUSA_PEN_GCODE_SETTINGS,
     )
     expect(loadSettingsPreset('default')).toMatchObject({
-      joinDistanceMm: 0.5,
-      penWidthMm: 0,
-      minStrokeLengthMm: 0,
+      joinDistanceMm: 0.35,
+      penWidthMm: 0.35,
+      minStrokeLengthMm: 0.5,
+      fillSettings: { spacingMm: 0.35, fillOffsetMm: 0.175 },
+      pathOptions: {
+        reorderPaths: true,
+        reversePaths: true,
+        joinPaths: true,
+      },
     })
   })
 
@@ -90,24 +101,82 @@ describe('settings preset initialization', () => {
     expect(listSettingsPresetNames()).not.toContain('prusa_pen')
   })
 
-  it('旧default初期値だけをflipYオンへ移行し、編集済み設定と旧Prusaは保持する', () => {
-    const { flipY: _flipY, ...oldDefaultSettings } = DEFAULT_GCODE_SETTINGS
+  it('旧defaultのflipY移行を維持し、その後の組み込み既定値移行を行う', () => {
+    const { flipY: _flipY, ...oldDefaultSettings } =
+      LEGACY_DEFAULT_GCODE_SETTINGS
     const { flipY: _prusaFlipY, ...oldPrusaSettings } = PRUSA_PEN_GCODE_SETTINGS
     memory.set(
       'path2plot.settingsPresets',
       JSON.stringify({
         defaultName: 'default',
         presets: {
-          default: { gcodeSettings: { ...oldDefaultSettings, flipY: false } },
-          custom: { gcodeSettings: { ...oldDefaultSettings, bedWidthMm: 123 } },
+          default: {
+            ...LEGACY_DEFAULT_SETTINGS,
+            gcodeSettings: { ...oldDefaultSettings, flipY: false },
+          },
+          custom: {
+            ...LEGACY_DEFAULT_SETTINGS,
+            gcodeSettings: { ...oldDefaultSettings, bedWidthMm: 123 },
+          },
           prusa_pen: { gcodeSettings: oldPrusaSettings },
         },
       }),
     )
     memory.set('path2plot.settingsPresets.initialPresets.v1', '1')
 
-    expect(loadSettingsPreset('default')?.gcodeSettings.flipY).toBe(true)
+    expect(loadSettingsPreset('default')?.gcodeSettings).toEqual(
+      DEFAULT_GCODE_SETTINGS,
+    )
     expect(loadSettingsPreset('custom')?.gcodeSettings.flipY).toBe(false)
     expect(loadSettingsPreset('prusa_pen')?.gcodeSettings.flipY).toBe(false)
+  })
+
+  it('キー順が違っても未編集の旧defaultだけ移行し、編集済み項目は保持する', () => {
+    const reverseKeys = (value: unknown): unknown => {
+      if (Array.isArray(value)) return value.map(reverseKeys)
+      if (value !== null && typeof value === 'object')
+        return Object.fromEntries(
+          Object.entries(value)
+            .reverse()
+            .map(([k, v]) => [k, reverseKeys(v)]),
+        )
+      return value
+    }
+    memory.set(
+      'path2plot.settingsPresets',
+      JSON.stringify({
+        defaultName: 'default',
+        presets: {
+          default: reverseKeys(LEGACY_DEFAULT_SETTINGS),
+          custom: { ...LEGACY_DEFAULT_SETTINGS, joinDistanceMm: 7 },
+        },
+      }),
+    )
+    memory.set('path2plot.settingsPresets.initialPresets.v1', '1')
+    memory.set('path2plot.settingsPresets.defaultFlipY.v1', '1')
+
+    expect(loadSettingsPreset('default')?.gcodeSettings).toEqual(
+      DEFAULT_GCODE_SETTINGS,
+    )
+    expect(loadSettingsPreset('custom')?.joinDistanceMm).toBe(7)
+  })
+
+  it('以前のflipY migration marker後のfalseはユーザー値として保持する', () => {
+    const modified = {
+      ...LEGACY_DEFAULT_SETTINGS,
+      gcodeSettings: { ...LEGACY_DEFAULT_SETTINGS.gcodeSettings, flipY: false },
+    }
+    memory.set(
+      'path2plot.settingsPresets',
+      JSON.stringify({
+        defaultName: 'default',
+        presets: { default: modified },
+      }),
+    )
+    memory.set('path2plot.settingsPresets.initialPresets.v1', '1')
+    memory.set('path2plot.settingsPresets.defaultFlipY.v1', '1')
+
+    expect(loadSettingsPreset('default')?.gcodeSettings.flipY).toBe(false)
+    expect(loadSettingsPreset('default')?.gcodeSettings.drawAccel).toBe(7000)
   })
 })
