@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "settings": {
+    "parseSettings": {
+      "dpi": 72,
+      "scaleFactor": 1,
+      "bezierToleranceMm": 0.1,
+      "offsetXMm": 0,
+      "offsetYMm": 0
+    },
+    "gcodeSettings": {
+      "drawFeedRate": 24000,
+      "travelFeedRate": 24000,
+      "penFeedRate": 750,
+      "penDownZ": 19,
+      "penUpZ": 23,
+      "travelZ": 30,
+      "drawAccel": 6000,
+      "travelAccel": 6000,
+      "xyJerk": 10,
+      "minSegmentLengthMm": 0.1,
+      "bedWidthMm": 89,
+      "bedHeightMm": 53,
+      "bedOriginXMm": 3.5,
+      "bedOriginYMm": 15.5,
+      "flipY": true,
+      "parkX": 0,
+      "parkY": 0,
+      "templates": {
+        "start": "PLOT_START\nM204 S{travelAccel}\n",
+        "travelMove": "G0 X{x} Y{y} F{travelFeedRate}",
+        "penDown": "M204 S{drawAccel}\nPEN_DOWN",
+        "drawMove": "G1 X{x} Y{y} F{drawFeedRate}",
+        "penUp": "M204 S{travelAccel}\nPEN_UP",
+        "end": "PEN_UP\nPLOT_END\n\n"
+      }
+    },
+    "fillSettings": {
+      "pattern": "hatch",
+      "offsetSpiralMode": true,
+      "angleDeg": 45,
+      "spacingMm": 0.35,
+      "crossHatch": false,
+      "crossAngleDeg": 135,
+      "waveform": "straight",
+      "waveAmplitudeMm": 0.25,
+      "waveLengthMm": 2,
+      "waveSegmentsPerCycle": 8,
+      "minHatchLineLengthMm": 0,
+      "connect": "boustrophedon",
+      "connectDistanceFactor": 3,
+      "overlapPercent": 0,
+      "fillOffsetMm": 0.175,
+      "drawOutline": true
+    },
+    "joinDistanceMm": 0.35,
+    "penWidthMm": 0.35,
+    "minStrokeLengthMm": 0.5,
+    "pathOptions": {
+      "optimizePaths": true,
+      "optimizeTravel": true,
+      "reorderPaths": true,
+      "reversePaths": true,
+      "joinPaths": true
+    }
+  }
+}

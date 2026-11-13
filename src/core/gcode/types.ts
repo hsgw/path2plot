@@ -1,4 +1,5 @@
 import type { Point } from '../geometry/types'
+import defaultSettingsFile from '../default-settings.json'
 
 /** 1回のペンダウン〜ペンアップで連続描画する点列(FR-14の結合ブロック単位) */
 export type DrawGroup = Point[]
@@ -130,44 +131,31 @@ export const LEGACY_DEFAULT_GCODE_TEMPLATES: GcodeTemplates = {
   end: 'PEN_UP\nPLOT_END',
 }
 
-export const DEFAULT_GCODE_TEMPLATES: GcodeTemplates = {
-  start: 'PLOT_START\nM204 S{travelAccel}\n',
-  travelMove: 'G0 X{x} Y{y} F{travelFeedRate}',
-  penDown: 'M204 S{drawAccel}\nPEN_DOWN',
-  drawMove: 'G1 X{x} Y{y} F{drawFeedRate}',
-  penUp: 'M204 S{travelAccel}\nPEN_UP',
-  end: 'PEN_UP\nPLOT_END\n\n',
-}
+export const DEFAULT_GCODE_TEMPLATES: GcodeTemplates =
+  defaultSettingsFile.settings.gcodeSettings.templates
 
-/** 新しいペンプロッター向け既定値 */
-export const DEFAULT_GCODE_SETTINGS: GcodeSettings = {
+/** 新しいペンプロッター向け既定値は default-settings.json を正本とする。 */
+export const DEFAULT_GCODE_SETTINGS: GcodeSettings =
+  defaultSettingsFile.settings.gcodeSettings
+
+/** 更新前の既定値。既存プリセットの移行判定と欠落項目補完にのみ使う。 */
+export const LEGACY_DEFAULT_GCODE_SETTINGS: GcodeSettings = {
   drawFeedRate: 24000,
   travelFeedRate: 24000,
   penFeedRate: 750,
   penDownZ: 19,
   penUpZ: 23,
   travelZ: 30,
-  drawAccel: 6000,
-  travelAccel: 6000,
+  drawAccel: 7000,
+  travelAccel: 8000,
   xyJerk: 10,
   minSegmentLengthMm: 0.1,
   bedWidthMm: 89,
   bedHeightMm: 53,
-  bedOriginXMm: 3.5,
-  bedOriginYMm: 15.5,
-  flipY: true,
-  parkX: 0,
-  parkY: 0,
-  templates: DEFAULT_GCODE_TEMPLATES,
-}
-
-/** 更新前の既定値。既存プリセットの移行判定と欠落項目補完にのみ使う。 */
-export const LEGACY_DEFAULT_GCODE_SETTINGS: GcodeSettings = {
-  ...DEFAULT_GCODE_SETTINGS,
-  drawAccel: 7000,
-  travelAccel: 8000,
   bedOriginXMm: 3,
   bedOriginYMm: 14,
   flipY: true,
+  parkX: 0,
+  parkY: 0,
   templates: LEGACY_DEFAULT_GCODE_TEMPLATES,
 }

@@ -22,6 +22,8 @@ interface SettingsStore {
   /** 起動時に自動ロードするプリセット名。未設定ならnull */
   defaultName: string | null
   presets: Record<string, StoredSettingsBundle>
+  /** 未編集の組み込みdefaultを将来のJSON更新へ追従させる比較基準 */
+  builtInDefault?: SettingsBundle
 }
 
 const STORAGE_KEY = 'path2plot.settingsPresets'
@@ -54,11 +56,45 @@ function sameSettings(a: unknown, b: unknown): boolean {
 }
 
 const PREVIOUS_DEFAULT_SETTINGS = {
-  ...INITIAL_PRESETS.default,
+  ...LEGACY_DEFAULT_SETTINGS,
   gcodeSettings: {
-    ...INITIAL_PRESETS.default.gcodeSettings,
+    ...LEGACY_DEFAULT_SETTINGS.gcodeSettings,
+    drawAccel: 6000,
+    travelAccel: 6000,
     bedOriginXMm: 3.25,
     bedOriginYMm: 14.5,
+    templates: {
+      start: 'PLOT_START\nM204 S{travelAccel}\n',
+      travelMove: 'G0 X{x} Y{y} F{travelFeedRate}',
+      penDown: 'M204 S{drawAccel}\nPEN_DOWN',
+      drawMove: 'G1 X{x} Y{y} F{drawFeedRate}',
+      penUp: 'M204 S{travelAccel}\nPEN_UP',
+      end: 'PEN_UP\nPLOT_END\n\n',
+    },
+  },
+  fillSettings: {
+    ...LEGACY_DEFAULT_SETTINGS.fillSettings,
+    spacingMm: 0.35,
+    fillOffsetMm: 0.175,
+  },
+  joinDistanceMm: 0.35,
+  penWidthMm: 0.35,
+  minStrokeLengthMm: 0.5,
+  pathOptions: {
+    optimizePaths: true,
+    optimizeTravel: true,
+    reorderPaths: true,
+    reversePaths: true,
+    joinPaths: true,
+  },
+}
+
+const SHIPPED_DEFAULT_SETTINGS = {
+  ...PREVIOUS_DEFAULT_SETTINGS,
+  gcodeSettings: {
+    ...PREVIOUS_DEFAULT_SETTINGS.gcodeSettings,
+    bedOriginXMm: 3.5,
+    bedOriginYMm: 15.5,
   },
 }
 
@@ -111,6 +147,39 @@ function migrateDefaultPreset(store: SettingsStore): void {
     }
     localStorage.setItem(DEFAULT_ORIGIN_MIGRATION_KEY, '1')
   }
+
+  refreshBuiltInDefault(store)
+}
+
+/** 未編集のdefaultだけ最新のJSON既定値へ追従させる。 */
+function refreshBuiltInDefault(store: SettingsStore): void {
+  const preset = store.presets.default
+  if (!preset) return
+
+  const currentSnapshot = createDefaultSettings()
+  if (store.builtInDefault && sameSettings(preset, store.builtInDefault)) {
+    let changed = false
+    if (!sameSettings(preset, currentSnapshot)) {
+      store.presets.default = currentSnapshot
+      changed = true
+    }
+    if (!sameSettings(store.builtInDefault, currentSnapshot)) {
+      store.builtInDefault = currentSnapshot
+      changed = true
+    }
+    if (changed) writeStore(store)
+  } else if (
+    !store.builtInDefault &&
+    (sameSettings(preset, currentSnapshot) ||
+      sameSettings(preset, SHIPPED_DEFAULT_SETTINGS))
+  ) {
+    // 初回起動、または既知のリリース既定値から移行した未編集defaultだけ記録する。
+    if (!sameSettings(preset, currentSnapshot)) {
+      store.presets.default = currentSnapshot
+    }
+    store.builtInDefault = currentSnapshot
+    writeStore(store)
+  }
 }
 
 function readStore(): SettingsStore {
@@ -121,6 +190,7 @@ function readStore(): SettingsStore {
       ? {
           defaultName: parsed.defaultName ?? null,
           presets: parsed.presets ?? {},
+          builtInDefault: parsed.builtInDefault,
         }
       : { defaultName: null, presets: {} }
 

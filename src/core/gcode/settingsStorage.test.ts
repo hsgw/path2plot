@@ -203,4 +203,29 @@ describe('settings preset initialization', () => {
     expect(loadSettingsPreset('default')?.gcodeSettings.bedOriginYMm).toBe(15.5)
     expect(loadSettingsPreset('edited')?.gcodeSettings.bedOriginXMm).toBe(4)
   })
+
+  it('保存済みの組み込み既定値スナップショットが古ければ最新JSONへ追従する', () => {
+    const previousDefault = createDefaultSettings()
+    previousDefault.gcodeSettings.bedOriginXMm = 3.25
+    previousDefault.gcodeSettings.bedOriginYMm = 14.5
+    memory.set(
+      'path2plot.settingsPresets',
+      JSON.stringify({
+        defaultName: 'default',
+        presets: { default: previousDefault },
+        builtInDefault: previousDefault,
+      }),
+    )
+    memory.set('path2plot.settingsPresets.initialPresets.v1', '1')
+    memory.set('path2plot.settingsPresets.defaultFlipY.v1', '1')
+    memory.set('path2plot.settingsPresets.defaultSettings.v2', '1')
+    memory.set('path2plot.settingsPresets.defaultOrigin.v3', '1')
+
+    expect(loadSettingsPreset('default')?.gcodeSettings.bedOriginXMm).toBe(3.5)
+    expect(loadSettingsPreset('default')?.gcodeSettings.bedOriginYMm).toBe(15.5)
+    expect(
+      JSON.parse(memory.get('path2plot.settingsPresets')!).builtInDefault
+        .gcodeSettings.bedOriginXMm,
+    ).toBe(3.5)
+  })
 })

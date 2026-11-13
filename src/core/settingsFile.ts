@@ -1,11 +1,11 @@
-import { DEFAULT_FILL_SETTINGS } from './fill/types'
+import { DEFAULT_FILL_SETTINGS, type FillSettings } from './fill/types'
 import {
-  DEFAULT_GCODE_SETTINGS,
   LEGACY_DEFAULT_GCODE_SETTINGS,
   type GcodeSettings,
 } from './gcode/types'
 import { DEFAULT_JOIN_DISTANCE_MM } from './plan/strokeJoin'
-import { DEFAULT_PARSE_SETTINGS } from './svg/types'
+import { DEFAULT_PARSE_SETTINGS, type ParseSettings } from './svg/types'
+import defaultSettingsFile from './default-settings.json'
 
 export const DEFAULT_PATH_OPTIONS = {
   optimizePaths: true,
@@ -17,7 +17,17 @@ export const DEFAULT_PATH_OPTIONS = {
 
 export type PathOptions = typeof DEFAULT_PATH_OPTIONS
 
-function buildSettings(gcodeSettings: GcodeSettings) {
+export interface SettingsBundle {
+  parseSettings: ParseSettings
+  gcodeSettings: GcodeSettings
+  fillSettings: FillSettings
+  joinDistanceMm: number
+  penWidthMm: number
+  minStrokeLengthMm: number
+  pathOptions: PathOptions
+}
+
+function buildLegacySettings(gcodeSettings: GcodeSettings): SettingsBundle {
   return {
     parseSettings: { ...DEFAULT_PARSE_SETTINGS },
     gcodeSettings: {
@@ -32,24 +42,22 @@ function buildSettings(gcodeSettings: GcodeSettings) {
   }
 }
 
+const DEFAULT_SETTINGS: SettingsBundle = {
+  ...defaultSettingsFile.settings,
+  fillSettings: defaultSettingsFile.settings.fillSettings as FillSettings,
+}
+
 export function createDefaultSettings() {
+  const settings = DEFAULT_SETTINGS
   return {
-    ...buildSettings(DEFAULT_GCODE_SETTINGS),
-    fillSettings: {
-      ...DEFAULT_FILL_SETTINGS,
-      spacingMm: 0.35,
-      fillOffsetMm: 0.175,
+    ...settings,
+    parseSettings: { ...settings.parseSettings },
+    gcodeSettings: {
+      ...settings.gcodeSettings,
+      templates: { ...settings.gcodeSettings.templates },
     },
-    joinDistanceMm: 0.35,
-    penWidthMm: 0.35,
-    minStrokeLengthMm: 0.5,
-    pathOptions: {
-      optimizePaths: true,
-      optimizeTravel: true,
-      reorderPaths: true,
-      reversePaths: true,
-      joinPaths: true,
-    },
+    fillSettings: { ...settings.fillSettings },
+    pathOptions: { ...settings.pathOptions },
   }
 }
 
@@ -57,13 +65,12 @@ export function createDefaultSettings() {
 export function createLegacySettings(
   gcodeSettings: GcodeSettings = LEGACY_DEFAULT_GCODE_SETTINGS,
 ) {
-  return buildSettings(gcodeSettings)
+  return buildLegacySettings(gcodeSettings)
 }
 
 /** 移行時にだけ使う、更新前の初期プリセット一式。 */
 export const LEGACY_DEFAULT_SETTINGS = createLegacySettings()
 
-export type SettingsBundle = ReturnType<typeof createDefaultSettings>
 export const MIN_FILL_SPACING_MM = 0.01
 
 export const GCODE_MINIMUMS: Partial<

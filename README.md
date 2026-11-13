@@ -89,7 +89,15 @@ SVGはUTF-8のXMLとして読み込みます。標準のXML文字参照を使用
 
 ビルド用PCで作った `dist-ssr/path2plot-cli.mjs` を Raspberry Pi 3 Model B（Raspbian 13、ARMv7/armhf）へコピーします。CLIの依存はファイルに同梱されるため、Piではインストール済みの `/usr/local/bin/node`（v22.23.4）で実行できます。
 
-Raspberry Pi（`klipper`）では、Web版の組み込み初期値をまとめた共有JSONを `/usr/local/share/path2plot/defaults.json` に配置しています。Pi上の別プロジェクトからも、この絶対パスを `--config` に渡して参照できます。`--config` はPiでも必須で、省略すると変換前にエラーで終了します。組み込み初期値の変更を共有JSONに反映するには、ファイルを再出力して更新します。
+組み込み初期値は [`src/core/default-settings.json`](src/core/default-settings.json) で管理します。Web と CLI はビルド時にこの JSON を取り込みます。初期値を変更したら再ビルドし、Pi の共有設定にも同じファイルを配備します。Web の保存済み `default` は、前回の組み込み初期値と一致する場合に更新されます。
+
+Raspberry Pi（`klipper`）では、共有 JSON を `/usr/local/share/path2plot/defaults.json` に配置しています。Pi 上の別プロジェクトからも、この絶対パスを `--config` に渡して参照できます。`--config` は Pi でも必須で、省略すると変換前にエラーで終了します。Pi でリポジトリを更新した後は、そのルートで次を実行して共有設定を更新できます。
+
+```bash
+shared=/usr/local/share/path2plot/defaults.json
+tmp=$(mktemp "$shared.XXXXXXXX")
+install -m 644 src/core/default-settings.json "$tmp" && mv -T "$tmp" "$shared"
+```
 
 CLIをたとえば `/opt/path2plot/` に置いた場合は、Pythonから次のように呼び出せます。
 
